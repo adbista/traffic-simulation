@@ -1,0 +1,48 @@
+{
+  "config": {
+    "laneDeclarations": [
+      {"road": "north", "lane": 0, "movements": ["STRAIGHT"]},
+      {"road": "north", "lane": 1, "movements": ["LEFT"]},
+      {"road": "north", "lane": 2, "movements": ["STRAIGHT", "RIGHT"]},
+      {"road": "south", "lane": 0, "movements": ["STRAIGHT"]},
+      {"road": "south", "lane": 1, "movements": ["LEFT"]},
+      {"road": "south", "lane": 2, "movements": ["STRAIGHT", "RIGHT"]},
+      {"road": "east",  "lane": 0, "movements": ["STRAIGHT"]},
+      {"road": "east",  "lane": 1, "movements": ["LEFT"]},
+      {"road": "east",  "lane": 2, "movements": ["STRAIGHT", "RIGHT"]},
+      {"road": "west",  "lane": 0, "movements": ["STRAIGHT"]},
+      {"road": "west",  "lane": 1, "movements": ["LEFT"]},
+      {"road": "west",  "lane": 2, "movements": ["STRAIGHT", "RIGHT"]}
+    ]
+  },
+  "commands": [
+    {"type": "addVehicle", "vehicleId": "v_n_str",   "startRoad": "north", "endRoad": "south",  "lane": 0},
+    {"type": "addVehicle", "vehicleId": "v_n_left",  "startRoad": "north", "endRoad": "east",   "lane": 1},
+    {"type": "addVehicle", "vehicleId": "v_n_right", "startRoad": "north", "endRoad": "west",   "lane": 2},
+    {"type": "addVehicle", "vehicleId": "v_s_str",   "startRoad": "south", "endRoad": "north",  "lane": 0},
+    {"type": "addVehicle", "vehicleId": "v_s_left",  "startRoad": "south", "endRoad": "west",   "lane": 1},
+    {"type": "addVehicle", "vehicleId": "v_s_right", "startRoad": "south", "endRoad": "east",   "lane": 2},
+    {"type": "addVehicle", "vehicleId": "v_e_str",   "startRoad": "east",  "endRoad": "west",   "lane": 0},
+    {"type": "addVehicle", "vehicleId": "v_e_left",  "startRoad": "east",  "endRoad": "north",  "lane": 1},
+    {"type": "addVehicle", "vehicleId": "v_e_right", "startRoad": "east",  "endRoad": "south",  "lane": 2},
+    {"type": "addVehicle", "vehicleId": "v_w_str",   "startRoad": "west",  "endRoad": "east",   "lane": 0},
+    {"type": "addVehicle", "vehicleId": "v_w_left",  "startRoad": "west",  "endRoad": "south",  "lane": 1},
+    {"type": "addVehicle", "vehicleId": "v_w_right", "startRoad": "west",  "endRoad": "north",  "lane": 2},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"}
+  ]
+}

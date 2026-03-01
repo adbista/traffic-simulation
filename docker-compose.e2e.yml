@@ -1,0 +1,18 @@
+services:
+  app:
+    image: trafficsim:latest
+    # Expose on port 9090 to avoid collisions with any local dev server
+    ports:
+      - "9090:8080"
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    depends_on:
+      - app
+    environment:
+      - WS_URL=ws://app:8080/v1/ws/simulation
+      - HEALTH_URL=http://app:8080/health
+    # Do not restart on failure — let CI see the exit code
+    restart: "no"

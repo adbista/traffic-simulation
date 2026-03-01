@@ -1,0 +1,19 @@
+{
+  "stepStatuses" : [ {
+    "leftVehicles" : [ "n1", "s1" ],
+    "activePhaseId" : "p0",
+    "signalState" : "GREEN"
+  }, {
+    "leftVehicles" : [ ],
+    "activePhaseId" : "p1",
+    "signalState" : "GREEN"
+  }, {
+    "leftVehicles" : [ "nl" ],
+    "activePhaseId" : "p1",
+    "signalState" : "GREEN"
+  }, {
+    "leftVehicles" : [ ],
+    "activePhaseId" : "p2",
+    "signalState" : "GREEN"
+  } ]
+}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Traffic Simulation</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+
+<header class="header">
+    <div class="header-title">
+        <span class="header-icon">&#127942;</span>
+        <h1>Traffic Simulation</h1>
+    </div>
+    <div class="header-status">
+        <span id="connectionStatus" class="status status-offline">Roz&#322;&#261;czono</span>
+        <span id="initStatus"       class="status status-offline">Brak sesji</span>
+    </div>
+</header>
+
+<div class="layout">
+
+    <!-- ── LEFT: Controls ── -->
+    <aside class="controls">
+
+        <section class="panel">
+            <h2>&#128279; Po&#322;&#261;czenie</h2>
+            <div class="field">
+                <label for="wsUrl">WebSocket URL</label>
+                <input id="wsUrl" type="text" value="ws://localhost:8080/v1/ws/simulation" />
+            </div>
+            <div class="btn-row">
+                <button id="connectBtn"    type="button" class="btn-primary">Po&#322;&#261;cz</button>
+                <button id="disconnectBtn" type="button" class="btn-danger"  disabled>Roz&#322;&#261;cz</button>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>&#9881;&#65039; Inicjalizacja sesji</h2>
+            <div class="field">
+                <label for="initPayload">WsInitRequest JSON</label>
+                <textarea id="initPayload" rows="5">{}</textarea>
+            </div>
+            <button id="initBtn" type="button" class="btn-primary w-full" disabled>Wy&#347;lij init</button>
+        </section>
+
+        <section class="panel">
+            <h2>&#128663; Dodaj pojazd</h2>
+            <form id="addVehicleForm">
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="vehicleId">vehicleId</label>
+                        <input id="vehicleId" type="text" placeholder="v1" required />
+                    </div>
+                    <div class="field">
+                        <label for="lane">lane (opt.)</label>
+                        <input id="lane" type="number" min="0" placeholder="&#8212;" />
+                    </div>
+                    <div class="field">
+                        <label for="startRoad">startRoad</label>
+                        <select id="startRoad" required>
+                            <option value="north">&#8593; north</option>
+                            <option value="south" selected>&#8595; south</option>
+                            <option value="east">&#8594; east</option>
+                            <option value="west">&#8592; west</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="endRoad">endRoad</label>
+                        <select id="endRoad" required>
+                            <option value="north" selected>&#8593; north</option>
+                            <option value="south">&#8595; south</option>
+                            <option value="east">&#8594; east</option>
+                            <option value="west">&#8592; west</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="addVehicleBtn" type="submit" class="btn-primary w-full" disabled>
+                    + Dodaj pojazd
+                </button>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2>&#9654; Sterowanie</h2>
+            <div class="btn-row">
+                <button id="stepBtn" type="button" class="btn-secondary" disabled>Step &#8594;</button>
+                <button id="stopBtn" type="button" class="btn-danger"    disabled>Stop &#9632;</button>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>&#128196; Log zdarze&#324;</h2>
+            <div id="eventLog" class="log"></div>
+        </section>
+
+    </aside>
+
+    <!-- ── RIGHT: Visualisation ── -->
+    <div class="visualisation">
+        <div class="canvas-wrapper">
+            <canvas id="intersectionCanvas" width="600" height="600"></canvas>
+            <canvas id="vehicleCanvas"      width="600" height="600"></canvas>
+            <span class="road-label label-north">N</span>
+            <span class="road-label label-south">S</span>
+            <span class="road-label label-west">W</span>
+            <span class="road-label label-east">E</span>
+        </div>
+
+        <section class="panel history-panel">
+            <h2>&#128260; Historia krok&#243;w (odpowiedzi serwera)</h2>
+            <div id="stepHistory" class="step-history"></div>
+        </section>
+    </div>
+
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+/* ── Reset / base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --text-muted:#8b949e;
+    --primary:   #238636;
+    --primary-h: #2ea043;
+    --danger:    #da3633;
+    --danger-h:  #f85149;
+    --accent:    #1f6feb;
+    --radius:    8px;
+    --font:       'Segoe UI', Inter, system-ui, sans-serif;
+}
+
+html, body { height: 100%; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-icon { font-size: 22px; }
+
+.header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: .3px;
+}
+
+.header-status {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── Layout split ─────────────────────────────────────────────────────────── */
+.layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 16px;
+    padding: 16px;
+    max-width: 1300px;
+    margin: 0 auto;
+    align-items: start;
+}
+
+/* ── Controls column ──────────────────────────────────────────────────────── */
+.controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ── Visualisation column ─────────────────────────────────────────────────── */
+.visualisation {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ── Panels ───────────────────────────────────────────────────────────────── */
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+}
+
+.panel h2 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    margin-bottom: 10px;
+}
+
+/* ── Form elements ────────────────────────────────────────────────────────── */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.field label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+input, select, textarea {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color .15s;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+}
+
+textarea { resize: vertical; font-family: monospace; }
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+button {
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background .15s, opacity .15s;
+}
+
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn-primary   { background: var(--primary);  color: #fff; border-color: var(--primary);  }
+.btn-primary:not(:disabled):hover { background: var(--primary-h); }
+
+.btn-danger    { background: transparent; color: var(--danger);   border-color: var(--danger);   }
+.btn-danger:not(:disabled):hover  { background: var(--danger); color: #fff; }
+
+.btn-secondary { background: transparent; color: var(--text);     border-color: var(--border);   }
+.btn-secondary:not(:disabled):hover { background: var(--border); }
+
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.w-full  { width: 100%; }
+
+/* ── Status badges ────────────────────────────────────────────────────────── */
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.status-online  { background: #0f2d1a; color: #3fb950; }
+.status-online::before  { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+
+.status-offline { background: #2d1010; color: #f85149; }
+.status-offline::before { background: #f85149; }
+
+/* ── Canvas wrapper ───────────────────────────────────────────────────────── */
+.canvas-wrapper {
+    position: relative;
+    width: 600px;
+    height: 600px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+.canvas-wrapper canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+}
+
+/* keep vehicle canvas transparent so intersection shows through */
+#vehicleCanvas { background: transparent; }
+
+/* Road direction labels */
+.road-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.4);
+    pointer-events: none;
+    user-select: none;
+}
+
+.label-north { top: 6px;  left: 50%; transform: translateX(-50%); }
+.label-south { bottom: 6px; left: 50%; transform: translateX(-50%); }
+.label-west  { left: 6px;  top: 50%; transform: translateY(-50%); }
+.label-east  { right: 6px; top: 50%; transform: translateY(-50%); }
+
+/* ── Step history ─────────────────────────────────────────────────────────── */
+.history-panel { flex: 1; }
+
+.step-history {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.history-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px;
+    background: var(--bg);
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    animation: fadeIn .2s ease;
+}
+
+.history-step {
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+    font-size: 11px;
+    min-width: 50px;
+}
+
+.history-vehicles { color: #3fb950; font-family: monospace; }
+.history-empty    { color: var(--text-muted); font-style: italic; }
+
+/* ── Event log ────────────────────────────────────────────────────────────── */
+.log {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.log-line {
+    font-size: 12px;
+    line-height: 1.4;
+    border-left: 3px solid var(--border);
+    padding: 2px 0 2px 8px;
+    word-break: break-word;
+    color: var(--text-muted);
+    font-family: monospace;
+    animation: fadeIn .15s ease;
+}
+
+.log-line.info    { border-color: var(--accent);  color: #79c0ff; }
+.log-line.success { border-color: #3fb950; color: #3fb950; }
+.log-line.error   { border-color: var(--danger);  color: #f85149; }
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 1000px) {
+    .layout { grid-template-columns: 1fr; }
+    .canvas-wrapper { width: 100%; height: auto; aspect-ratio: 1; }
+    .canvas-wrapper canvas { width: 100% !important; height: 100% !important; }
+}
+
+@media (max-width: 600px) {
+    .grid-2 { grid-template-columns: 1fr; }
+}
+

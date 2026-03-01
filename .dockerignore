@@ -1,0 +1,10 @@
+.git
+.gitignore
+.gradle
+build
+bin
+out
+.idea
+.vscode
+web/node_modules
+*.iml

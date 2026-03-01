@@ -1,0 +1,21 @@
+{
+  "config": {
+    "laneDeclarations": [
+      {"road": "north", "lane": 0, "movements": ["STRAIGHT", "RIGHT"]},
+      {"road": "north", "lane": 1, "movements": ["LEFT"]},
+      {"road": "south", "lane": 0, "movements": ["STRAIGHT", "RIGHT"]},
+      {"road": "south", "lane": 1, "movements": ["LEFT"]},
+      {"road": "east",  "lane": 0, "movements": ["STRAIGHT", "PERMISSIVE_LEFT", "RIGHT"]},
+      {"road": "west",  "lane": 0, "movements": ["STRAIGHT", "PERMISSIVE_LEFT", "RIGHT"]}
+    ]
+  },
+  "commands": [
+    {"type": "addVehicle", "vehicleId": "n1", "startRoad": "north", "endRoad": "south", "lane": 0},
+    {"type": "addVehicle", "vehicleId": "s1", "startRoad": "south", "endRoad": "north", "lane": 0},
+    {"type": "addVehicle", "vehicleId": "nl", "startRoad": "north", "endRoad": "east",  "lane": 1},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"}
+  ]
+}

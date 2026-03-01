@@ -1,0 +1,10 @@
+{
+  "name": "trafficsim-e2e",
+  "version": "1.0.0",
+  "description": "E2E WebSocket tests for traffic simulation",
+  "main": "run.js",
+  "type": "module",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
