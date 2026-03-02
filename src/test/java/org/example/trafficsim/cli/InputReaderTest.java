@@ -33,7 +33,7 @@ class InputReaderTest {
         PhaseTiming t = cfg.phaseTiming();
         assertEquals(1, t.minGreenSteps(), "default minGreen");
         assertEquals(5, t.maxGreenSteps(), "default maxGreen");
-        assertEquals(1, t.allRedSteps(),   "default allRed");
+        assertEquals(1, t.redSteps(),   "default allRed");
     }
 
     @Test

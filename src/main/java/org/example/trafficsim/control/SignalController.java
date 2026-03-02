@@ -1,6 +1,6 @@
 package org.example.trafficsim.control;
 
-import org.example.trafficsim.core.CrossroadState;
+import org.example.trafficsim.core.TrafficQueues;
 import org.example.trafficsim.signal.ActivePhase;
 import org.example.trafficsim.signal.Phase;
 
@@ -23,8 +23,7 @@ public class SignalController {
 
     // Checks whether the current phase should end and a new one begin.
     // Only acts while GREEN — no decisions during yellow or all-red.
-    public void maybeRequestSwitch(CrossroadState snap, ActivePhase active) {
-        // only make decisions while GREEN
+    public void maybeRequestSwitch(TrafficQueues queues, long stepNo, ActivePhase active) {
         if (!active.isGreen()) return;
 
         Phase cur = active.current();
@@ -45,17 +44,20 @@ public class SignalController {
         boolean anyQueueOnGreen = cur.greenRoads().stream().anyMatch(r -> {
             Set<Integer> lanes = cur.greenLanesFor(r);
             Set<Integer> toCheck = lanes.isEmpty() ? Set.of(0) : lanes;
-            return toCheck.stream().anyMatch(lane -> snap.queueLength(r, lane) > 0);
+            return toCheck.stream().anyMatch(lane -> queues.queueLength(r, lane) > 0);
         });
+
         if (!anyQueueOnGreen) {
             advanceToNextPhase(active);
             return;
         }
 
         // 4) switch if another phase scores notably better
-        var currentScore = scoreOf(snap, cur);
-        var best = policy.select(snap, phases, cur.id());
-        if (!best.phaseId().equals(cur.id()) && best.score() > currentScore * (1.0 + switchHysteresis)) {
+        double currentScore = scoreOf(queues, stepNo, cur);
+        var best = policy.select(queues, stepNo, phases, cur.id());
+
+        if (!best.phaseId().equals(cur.id())
+                && best.score() > currentScore * (1.0 + switchHysteresis)) {
             active.requestSwitchTo(best.phaseId());
         }
     }
@@ -67,8 +69,8 @@ public class SignalController {
     }
 
     // Returns the score for the given phase (used for hysteresis comparison)
-    private double scoreOf(CrossroadState snap, Phase phase) {
-        var sel = policy.select(snap, List.of(phase), phase.id());
+    private double scoreOf(TrafficQueues queues, long stepNo, Phase phase) {
+        var sel = policy.select(queues, stepNo, List.of(phase), phase.id());
         return sel.score();
     }
 
