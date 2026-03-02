@@ -4,6 +4,7 @@ import org.example.trafficsim.control.SignalController;
 import org.example.trafficsim.model.Road;
 import org.example.trafficsim.model.Vehicle;
 import org.example.trafficsim.signal.ActivePhase;
+import org.example.trafficsim.signal.Phase;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,13 +32,14 @@ public class SimulationEngine {
         stepNo++;
 
         List<Vehicle> departing = new ArrayList<>();
+        Phase currentPhase = activePhase.current();
 
         Set<Road> greens = activePhase.isGreen()
-                ? activePhase.current().greenRoads()
+                ? currentPhase.greenRoads()
                 : Set.of();
 
         for (Road r : greens) {
-            Set<Integer> greenLanes = activePhase.current().greenLanesFor(r);
+            Set<Integer> greenLanes = currentPhase.greenLanesFor(r);
             for (int laneIdx : greenLanes) {
                 queues.markGreenNow(r, laneIdx, stepNo);
 

@@ -72,7 +72,10 @@ public class SimulationWebSocketHandler extends TextWebSocketHandler {
 
         InputReader.ParsedConfig cfg = InputReader.parseConfig(initRequest.config);
         PhaseSetGenerator generator  = new PhaseSetGenerator(cfg.laneDeclarations(), cfg.phaseTiming());
-        SimulationEngine engine      = new SimulationEngineBuilder().phaseFactory(generator).build();
+        SimulationEngine engine      = new SimulationEngineBuilder()
+                .phaseFactory(generator)
+                .laneDeclarations(cfg.laneDeclarations())
+                .build();
 
         state.dispatcher = new StreamingCommandDispatcher(
                 engine,

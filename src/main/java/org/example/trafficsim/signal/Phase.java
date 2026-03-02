@@ -14,8 +14,10 @@ public record Phase(
 ) {
 
     // Returns which lanes are green for road r (lane mode).
-    // Empty set = all lanes of that road are green.
     public Set<Integer> greenLanesFor(Road r) {
         return greenLaneIndices.getOrDefault(r, Set.of());
+    }
+    public boolean activatesRoad(Road r) {
+        return greenRoads.contains(r);
     }
 }

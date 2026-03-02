@@ -7,6 +7,7 @@ public enum Movement {
     STRAIGHT, RIGHT, LEFT, PERMISSIVE_LEFT;
 
     public static Movement fromString(String s) {
+        if (s == null) throw new IllegalArgumentException("Movement string is null");
         return Movement.valueOf(s.trim().toUpperCase());
     }
 
@@ -17,13 +18,6 @@ public enum Movement {
             case LEFT,
                  PERMISSIVE_LEFT -> leftOf(from);
         };
-    }
-
-
-    public static Movement derivedFrom(Road start, Road end) {
-        if (end == opposite(start)) return STRAIGHT;
-        if (end == rightOf(start))  return RIGHT;
-        return LEFT; 
     }
 
     public static Road opposite(Road r) {

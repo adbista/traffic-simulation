@@ -23,26 +23,27 @@ public class ActivePhase {
     public int timeInState()           { return timeInState; }
     public String pendingNextPhaseId(){ return pendingNextPhaseId; }
 
-    // Requests a switch to the given phase id.
-    // If yellowSteps > 0: GREEN -> YELLOW (drivers slow down)
-    // If yellowSteps == 0: GREEN -> RED directly (compatibility mode)
+
     public void requestSwitchTo(String nextPhaseId) {
-        this.pendingNextPhaseId = nextPhaseId;
-        if (state == SignalColorPhaseState.GREEN) {
-            if (current.timing().yellowSteps() > 0) {
-                state = SignalColorPhaseState.YELLOW;
-            } else {
-                state = SignalColorPhaseState.RED;
-            }
-            timeInState = 0;
+        if (nextPhaseId == null || nextPhaseId.equals(current.id())) {
+            return;
         }
-        // if already YELLOW or RED, do nothing — wait for the buffer to expire
+        if (state != SignalColorPhaseState.GREEN) {
+            return;
+        }
+        this.pendingNextPhaseId = nextPhaseId;
+        if (current.timing().yellowSteps() > 0) {
+            state = SignalColorPhaseState.YELLOW;
+        } else {
+            state = SignalColorPhaseState.RED;
+        }
+        timeInState = 0;
     }
 
     // Advances the state machine by one simulation step:
     // GREEN  - counts time; state only changes via requestSwitchTo
     // YELLOW - transitions to RED after yellowSteps
-    // RED    - activates the new phase and returns to GREEN after allRedSteps
+    // RED    - activates the new phase and returns to GREEN after redSteps
     public void tick(PhaseDefinitionResolver resolver) {
         timeInState++;
 
@@ -57,7 +58,7 @@ public class ActivePhase {
             }
             // all lights red briefly so drivers can react before the next phase begins
             case RED -> { 
-                if (timeInState >= current.timing().allRedSteps()) {
+                if (timeInState >= current.timing().redSteps()) {
                     if (pendingNextPhaseId == null) return; // safety guard; should not happen normally 
                     this.current = resolver.resolve(pendingNextPhaseId);
                     this.pendingNextPhaseId = null;

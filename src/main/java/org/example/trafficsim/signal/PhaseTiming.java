@@ -1,15 +1,28 @@
 package org.example.trafficsim.signal;
 
 // Timing configuration for a single signal phase (values in simulation steps).
-// Standard cycle: GREEN (minGreen–maxGreen) → YELLOW (yellowSteps) → ALL_RED (allRedSteps) → GREEN
+// Standard cycle: GREEN (minGreen–maxGreen) → YELLOW (yellowSteps) → RED (redSteps) → GREEN
 public record PhaseTiming(
-        int minGreenSteps,  // minimum steps before a switch is allowed
-        int maxGreenSteps,  // maximum green steps; switch is forced afterwards
-        int yellowSteps,    // steps spent yellow (vehicles slow down, no new departures)
-        int allRedSteps     // steps with all-red before the next green starts
+        int minGreenSteps,
+        int maxGreenSteps,
+        int yellowSteps,
+        int redSteps
 ) {
-    // Short constructor: yellowSteps defaults to 0 (no explicit yellow; backwards compatibility).
-    // Set yellowSteps > 0 explicitly for a realistic yellow phase.
+    public PhaseTiming {
+        if (minGreenSteps < 0) {
+            throw new IllegalArgumentException("minGreenSteps cannot be negative");
+        }
+        if (maxGreenSteps < minGreenSteps) {
+            throw new IllegalArgumentException("maxGreenSteps cannot be smaller than minGreenSteps");
+        }
+        if (yellowSteps < 0) {
+            throw new IllegalArgumentException("yellowSteps cannot be negative");
+        }
+        if (redSteps < 0) {
+            throw new IllegalArgumentException("redSteps cannot be negative");
+        }
+    }
+
     public PhaseTiming(int minGreenSteps, int maxGreenSteps, int allRedSteps) {
         this(minGreenSteps, maxGreenSteps, 0, allRedSteps);
     }
