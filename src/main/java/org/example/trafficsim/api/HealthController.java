@@ -8,11 +8,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * Simple health-check endpoint used by monitoring tools and E2E tests.
- *
- * GET /health → {"status":"UP","service":"trafficsim"}
- */
 @RestController
 @RequestMapping("/health")
 public class HealthController {

@@ -1,6 +1,6 @@
 package org.example.trafficsim.control;
 
-import org.example.trafficsim.core.CrossroadState;
+import org.example.trafficsim.core.TrafficQueues;
 import org.example.trafficsim.model.Road;
 import org.example.trafficsim.signal.Phase;
 
@@ -21,25 +21,32 @@ public class MaxPressurePolicy implements PhaseSelectionPolicy {
     }
 
     @Override
-    public Selection select(CrossroadState snapshot, List<Phase> phases, String currentPhaseId) {
+    public Selection select(TrafficQueues queues, long stepNo, List<Phase> phases, String currentPhaseId) {
         String bestId = currentPhaseId;
         double bestScore = Double.NEGATIVE_INFINITY;
 
         for (Phase p : phases) {
             double score = 0.0;
+
             for (Road r : p.greenRoads()) {
                 double w = weights.getOrDefault(r, 1.0);
                 Set<Integer> greenLanes = p.greenLanesFor(r);
                 Set<Integer> toScore = greenLanes.isEmpty() ? Set.of(0) : greenLanes;
+
                 for (int laneIdx : toScore) {
-                    score += w * (snapshot.queueLength(r, laneIdx) + alpha * snapshot.stepsSinceGreen(r, laneIdx));
+                    score += w * (
+                            queues.queueLength(r, laneIdx)
+                                    + alpha * queues.stepsSinceGreen(r, laneIdx, stepNo)
+                    );
                 }
             }
+
             if (score > bestScore) {
                 bestScore = score;
                 bestId = p.id();
             }
         }
+
         return new Selection(bestId, bestScore);
     }
 }

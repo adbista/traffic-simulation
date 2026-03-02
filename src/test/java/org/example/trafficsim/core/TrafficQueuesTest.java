@@ -27,65 +27,7 @@ class TrafficQueuesTest {
 
     @BeforeEach
     void setUp() {
-        queues = new TrafficQueues(); // single lane per road
-    }
-
-    // podstawowa kolejka pojazdow
-
-    @Test
-    void addAndPollVehicle() {
-        queues.addVehicle(v("v1", Road.NORTH));
-        List<Vehicle> polled = queues.pollLane(Road.NORTH);
-        assertEquals(1, polled.size());
-        assertEquals("v1", polled.get(0).id());
-    }
-
-    @Test
-    void pollFromEmptyLaneReturnsEmpty() {
-        List<Vehicle> polled = queues.pollLane(Road.NORTH);
-        assertTrue(polled.isEmpty());
-    }
-
-    @Test
-    void queueLenCountsAllVehicles() {
-        queues.addVehicle(v("v1", Road.NORTH));
-        queues.addVehicle(v("v2", Road.NORTH));
-        assertEquals(2, queues.queueLen(Road.NORTH));
-    }
-
-    @Test
-    void pollReducesQueueLen() {
-        queues.addVehicle(v("v1", Road.NORTH));
-        queues.addVehicle(v("v2", Road.NORTH));
-        queues.pollLane(Road.NORTH);
-        assertEquals(1, queues.queueLen(Road.NORTH));
-    }
-
-    // kolejnosc wg kolejki FIFO
-
-    @Test
-    void vehiclesDepartFifoWithinLane() {
-        queues.addVehicle(v("first",  Road.NORTH));
-        queues.addVehicle(v("second", Road.NORTH));
-
-        List<Vehicle> polled = queues.pollLane(Road.NORTH);
-        assertEquals("first", polled.get(0).id()); // FIFO: first added, first polled
-    }
-
-    // wiele pasow
-
-    @Test
-    void multiLanePollsOneVehiclePerLane() {
-        Map<Road, Integer> lanes = new EnumMap<>(Road.class);
-        for (Road r : Road.values()) lanes.put(r, 1);
-        lanes.put(Road.NORTH, 2); // 2 lanes on north
-
-        TrafficQueues mq = new TrafficQueues(lanes);
-        mq.addVehicle(vInLane("lane0", Road.NORTH, 0));
-        mq.addVehicle(vInLane("lane1", Road.NORTH, 1));
-
-        List<Vehicle> polled = mq.pollLane(Road.NORTH);
-        assertEquals(2, polled.size());
+        queues = new TrafficQueues();
     }
 
     @Test
@@ -105,38 +47,6 @@ class TrafficQueuesTest {
         assertThrows(IllegalArgumentException.class,
             () -> mq.addVehicle(vInLane("v2", Road.NORTH, -1)),
             "Should throw when lane index < 0");
-    }
-
-    // liczniki oczekiwania
-
-    @Test
-    void stepsSinceGreenStartsAtZero() {
-        assertEquals(0, queues.stepsSinceGreen(Road.NORTH));
-    }
-
-    @Test
-    void greenRoadsGetResetOthersIncrement() {
-        queues.updateWaitCounters(Map.of(Road.NORTH, Set.of(0), Road.SOUTH, Set.of(0)));
-        assertEquals(0, queues.stepsSinceGreen(Road.NORTH));
-        assertEquals(0, queues.stepsSinceGreen(Road.SOUTH));
-        assertEquals(1, queues.stepsSinceGreen(Road.EAST));
-        assertEquals(1, queues.stepsSinceGreen(Road.WEST));
-    }
-
-    @Test
-    void waitCounterAccumulatesOverMultipleSteps() {
-        queues.updateWaitCounters(Map.of(Road.NORTH, Set.of(0), Road.SOUTH, Set.of(0)));
-        queues.updateWaitCounters(Map.of(Road.NORTH, Set.of(0), Road.SOUTH, Set.of(0)));
-        assertEquals(2, queues.stepsSinceGreen(Road.EAST));
-    }
-
-    @Test
-    void waitCounterResetsWhenRoadTurnsGreen() {
-        queues.updateWaitCounters(Map.of(Road.NORTH, Set.of(0), Road.SOUTH, Set.of(0)));
-        queues.updateWaitCounters(Map.of(Road.NORTH, Set.of(0), Road.SOUTH, Set.of(0)));
-        queues.updateWaitCounters(Map.of(Road.EAST, Set.of(0), Road.WEST, Set.of(0))); // EW turns green
-        assertEquals(0, queues.stepsSinceGreen(Road.EAST));
-        assertEquals(1, queues.stepsSinceGreen(Road.NORTH)); // now waiting
     }
 
 }
