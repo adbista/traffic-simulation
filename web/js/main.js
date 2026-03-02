@@ -16,6 +16,10 @@ import { getDomElements }        from './ui/dom-elements.js';
 // ── DOM ──────────────────────────────────────────────────────────────────────
 const dom = getDomElements();
 
+// Auto-fill WebSocket URL from current host — works both on :8080 and any other port/host
+const _wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+dom.wsUrl.value = `${_wsProto}//${location.host}/v1/ws/simulation`;
+
 // ── Services ─────────────────────────────────────────────────────────────────
 const logger       = new LogView(dom.eventLog);
 const historyView  = new StepHistoryView(dom.stepHistory);
