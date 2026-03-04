@@ -1,6 +1,8 @@
 package org.example.trafficsim.core;
 
-import org.example.trafficsim.control.SignalController;
+import org.example.trafficsim.control.PhaseController;
+import org.example.trafficsim.metrics.FlowEmaTracker;
+import org.example.trafficsim.metrics.GreenStepTracker;
 import org.example.trafficsim.model.Road;
 import org.example.trafficsim.model.Vehicle;
 import org.example.trafficsim.signal.ActivePhase;
@@ -9,56 +11,78 @@ import org.example.trafficsim.signal.Phase;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 
 public class SimulationEngine {
     private final TrafficQueues queues;
     private final ActivePhase activePhase;
-    private final SignalController controller;
-    private long stepNo = 0;
-    private long vehicleSeq = 0;
+    private final PhaseController controller;
+    private final FlowEmaTracker flowTracker;
+    private final GreenStepTracker greenTracker;
+    private int stepNo = 0;
+    private int vehicleSeq = 0;
 
-    public SimulationEngine(TrafficQueues queues, ActivePhase activePhase, SignalController controller) {
+    public SimulationEngine(TrafficQueues queues, ActivePhase activePhase, PhaseController controller,
+                            FlowEmaTracker flowTracker, GreenStepTracker greenTracker) {
         this.queues = queues;
         this.activePhase = activePhase;
         this.controller = controller;
+        this.flowTracker = flowTracker;
+        this.greenTracker = greenTracker;
     }
 
     public void addVehicle(String id, Road start, Road end, int lane) {
-        queues.addVehicle(new Vehicle(id, start, end, stepNo, vehicleSeq++, lane));
+        int posId = queues.addVehicle(new Vehicle(id, start, end, stepNo, vehicleSeq++, lane));
+        flowTracker.onArrival(posId);
     }
 
     public StepResult step() {
         stepNo++;
+        flowTracker.advanceStep();
 
         List<Vehicle> departing = new ArrayList<>();
         Phase currentPhase = activePhase.current();
 
-        Set<Road> greens = activePhase.isGreen()
-                ? currentPhase.greenRoads()
-                : Set.of();
+        if (activePhase.isGreen()) {
+            // mask for positionIds that are related to this phase
+            long greenMask = currentPhase.positionsMask();
+            long tmp = greenMask;
 
-        for (Road r : greens) {
-            Set<Integer> greenLanes = currentPhase.greenLanesFor(r);
-            for (int laneIdx : greenLanes) {
-                queues.markGreenNow(r, laneIdx, stepNo);
+            while (tmp != 0) {
+                // find next '1' indicating this positionId is in this phase
+                int posId = Long.numberOfTrailingZeros(tmp);
+                tmp &= tmp - 1;
 
-                Vehicle v = queues.pollSpecificLane(r, laneIdx);
-                if (v != null) {
-                    departing.add(v);
+                greenTracker.markGreenNow(posId, stepNo);
+                // check if there is a vehicle on this line
+                if ((queues.nonEmptyPositionsMask() & (1L << posId)) == 0L) continue;
+                Vehicle head = queues.peek(posId);
+
+                Road fromRoad = queues.roadOf(posId);
+                // allowsDeparture comes from situation that on the same line we can have possible movements like LEFT, RIGHT.
+                // One car wants to go LEFT which is allowed in this phase
+                // but second wants to go RIGHT, which is prohibited - red light
+                if (currentPhase.allowsDeparture(posId, fromRoad, head.endRoad())
+                        && YieldCheck.check(head, currentPhase, queues)) {
+                    departing.add(queues.poll(posId));
                 }
+
             }
         }
-
+        // Sort by arrival sequence so that leftVehicles is in deterministic order.
+        // Without this, vehicles would appear in posId-iteration order (e.g. NORTH before
+        // SOUTH), not arrival order. Scenario tests use exact list equality, so this is
+        // required for 01-recruitment-scenario (expected: [vehicle1, vehicle2] = arrival
+        // order, not [vehicle2, vehicle1] = posId order). Traffic correctness is unaffected;
+        // the ordering only matters for reproducible output.
         departing.sort(Comparator.comparingLong(Vehicle::seqNum));
-
-        controller.maybeRequestSwitch(queues, stepNo, activePhase);
-        activePhase.tick(controller::resolve);
-
         List<String> leftVehicles = new ArrayList<>(departing.size());
         for (Vehicle v : departing) {
             leftVehicles.add(v.id());
         }
+
+        controller.managePhaseSwitch(queues, stepNo, activePhase);
+
+        activePhase.manageLightState();
 
         return new StepResult(leftVehicles);
     }

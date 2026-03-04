@@ -1,12 +1,8 @@
 package org.example.trafficsim.model;
 
-
-// Uzywany przez PhaseSetGenerator do budowania faz na poziomie ruchow
-// Dzieki temu mozna w jednej fazie mieć razem np.:
-//  { LaneSignal(NORTH, 0, STRAIGHT), LaneSignal(SOUTH, 0, PERMISSIVE_LEFT) }
-public record LaneSignal(Road road, int laneIndex, Movement movement) {
-
-    public Road destinationRoad() {
-        return movement.toRoad(road);
-    }
-}
+// Represents all signalled movements on a particular lane of a road, encoded as a bitmask.
+// GENERIC movements on the same lane are merged into one mask;
+// each PROTECTED movement gets its own LaneSignal with a single-bit mask.
+// Example: LaneSignal(NORTH, 0, MovementMask.LEFT, PROTECTED)
+//          LaneSignal(NORTH, 1, MovementMask.STRAIGHT | MovementMask.RIGHT, GENERIC)
+public record LaneSignal(Road road, int laneIndex, int movementMask, TrafficLightType trafficLightType) { }

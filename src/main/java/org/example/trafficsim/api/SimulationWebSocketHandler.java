@@ -1,14 +1,15 @@
 package org.example.trafficsim.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.trafficsim.cli.InputReader;
-import org.example.trafficsim.cli.SimulationEngineBuilder;
-import org.example.trafficsim.cli.StreamingCommandDispatcher;
+import org.example.trafficsim.io.InputReader;
+import org.example.trafficsim.core.SimulationEngineBuilder;
+import org.example.trafficsim.command.StreamingCommandDispatcher;
+import org.example.trafficsim.config.IntersectionConfig;
 import org.example.trafficsim.core.SimulationEngine;
 import org.example.trafficsim.io.CommandDTO;
 import org.example.trafficsim.io.OutputFile;
 import org.example.trafficsim.io.WsInitRequest;
-import org.example.trafficsim.signal.PhaseSetGenerator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -70,20 +71,16 @@ public class SimulationWebSocketHandler extends TextWebSocketHandler {
                                    String payload) throws IOException {
         WsInitRequest initRequest = MAPPER.readValue(payload, WsInitRequest.class);
 
-        InputReader.ParsedConfig cfg = InputReader.parseConfig(initRequest.config);
-        PhaseSetGenerator generator  = new PhaseSetGenerator(cfg.laneDeclarations(), cfg.phaseTiming());
-        SimulationEngine engine      = new SimulationEngineBuilder()
-                .phaseFactory(generator)
-                .laneDeclarations(cfg.laneDeclarations())
-                .build();
+       IntersectionConfig cfg = InputReader.parseConfig(initRequest.config);
+        SimulationEngine engine = new SimulationEngineBuilder(cfg).build();
 
-        state.dispatcher = new StreamingCommandDispatcher(
-                engine,
-                status -> sendStatus(session, status),
-                ()     -> closeGracefully(session)
-        );
-        state.initialized = true;
-        log.debug("WS session {} initialized", session.getId());
+       state.dispatcher = new StreamingCommandDispatcher(
+               engine,
+               status -> sendStatus(session, status),
+               () -> closeGracefully(session)
+       );
+       state.initialized = true;
+       log.debug("WS session {} initialized", session.getId());
     }
 
     private void dispatchCommand(WebSocketSession session,

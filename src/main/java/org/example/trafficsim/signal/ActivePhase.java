@@ -1,41 +1,40 @@
 package org.example.trafficsim.signal;
 
 
+import org.example.trafficsim.model.PhaseState;
 
 public class ActivePhase {
     private Phase current;
-    private SignalColorPhaseState state;
-    private int timeInState; // steps spent in the current signal colour state
-    private String pendingNextPhaseId; // set when a switch request has been made
+    private PhaseState state;
+    private int timeInState; // steps spent in the current signal light state
+    private Phase pendingNextPhase; // set when a switch request has been made
 
     public ActivePhase(Phase initial) {
+        if (initial == null) {
+            throw new IllegalArgumentException("Initial phase must not be null");
+        }
         this.current = initial;
-        this.state = SignalColorPhaseState.GREEN;
+        this.state = PhaseState.GREEN;
         this.timeInState = 0;
     }
 
     public Phase current()                      { return current; }
-    public SignalColorPhaseState signalState()  { return state; }
+    public boolean isGreen()  { return state == PhaseState.GREEN; }
 
-    public boolean isGreen()  { return state == SignalColorPhaseState.GREEN; }
-    public boolean isYellow() { return state == SignalColorPhaseState.YELLOW; }
+    public int timeInState() { return timeInState; }
 
-    public int timeInState()           { return timeInState; }
-    public String pendingNextPhaseId(){ return pendingNextPhaseId; }
-
-
-    public void requestSwitchTo(String nextPhaseId) {
-        if (nextPhaseId == null || nextPhaseId.equals(current.id())) {
+    public void requestNextPhase(Phase nextPhase) {
+        if (nextPhase == null || nextPhase.id().equals(current.id())) {
             return;
         }
-        if (state != SignalColorPhaseState.GREEN) {
+        if (state != PhaseState.GREEN) {
             return;
         }
-        this.pendingNextPhaseId = nextPhaseId;
+        this.pendingNextPhase = nextPhase;
         if (current.timing().yellowSteps() > 0) {
-            state = SignalColorPhaseState.YELLOW;
+            state = PhaseState.YELLOW;
         } else {
-            state = SignalColorPhaseState.RED;
+            state = PhaseState.RED;
         }
         timeInState = 0;
     }
@@ -44,25 +43,25 @@ public class ActivePhase {
     // GREEN  - counts time; state only changes via requestSwitchTo
     // YELLOW - transitions to RED after yellowSteps
     // RED    - activates the new phase and returns to GREEN after redSteps
-    public void tick(PhaseDefinitionResolver resolver) {
+    public void manageLightState() {
         timeInState++;
 
         switch (state) {
             case GREEN -> {} // nothing to do; waiting for a possible switch request
                     
-            case YELLOW -> {
+            case YELLOW -> { // whole one step could be just YELLOW state
                 if (timeInState >= current.timing().yellowSteps()) {
-                    state = SignalColorPhaseState.RED;
+                    state = PhaseState.RED;
                     timeInState = 0;
                 }
             }
             // all lights red briefly so drivers can react before the next phase begins
             case RED -> { 
                 if (timeInState >= current.timing().redSteps()) {
-                    if (pendingNextPhaseId == null) return; // safety guard; should not happen normally 
-                    this.current = resolver.resolve(pendingNextPhaseId);
-                    this.pendingNextPhaseId = null;
-                    this.state = SignalColorPhaseState.GREEN;
+                    if (pendingNextPhase == null) return; // safety guard, should not happen normally
+                    this.current = pendingNextPhase;
+                    this.pendingNextPhase = null;
+                    this.state = PhaseState.GREEN;
                     this.timeInState = 0;
                 }
             }

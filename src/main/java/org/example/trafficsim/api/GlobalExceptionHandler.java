@@ -9,15 +9,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.stream.Collectors;
 
-/**
- * Maps exceptions thrown during request handling to appropriate HTTP responses.
- *
- * 400 Bad Request is returned for:
- *   - malformed / unparseable JSON (HttpMessageNotReadableException — handled by Spring by default,
- *     but listed here for clarity and custom message format)
- *   - Bean Validation failures (@Valid on @RequestBody)
- *   - Unknown command type or invalid road / lane values (IllegalArgumentException)
- */
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

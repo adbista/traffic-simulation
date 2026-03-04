@@ -59,7 +59,7 @@ class JsonScenarioTest {
 
         Path actualOut = Files.createTempFile("scenario-" + name, ".json");
         try {
-            org.example.trafficsim.cli.Main.main(
+            org.example.trafficsim.app.Main.main(
                     new String[]{inputFile.getAbsolutePath(), actualOut.toAbsolutePath().toString()});
 
             OutputFile actual   = MAPPER.readValue(actualOut.toFile(), OutputFile.class);

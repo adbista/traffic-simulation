@@ -1,0 +1,8 @@
+{
+  "stepStatuses": [
+    {"leftVehicles": ["v1-north-protected-left"]},
+    {"leftVehicles": []},
+    {"leftVehicles": ["v2-south-straight"]},
+    {"leftVehicles": []}
+  ]
+}

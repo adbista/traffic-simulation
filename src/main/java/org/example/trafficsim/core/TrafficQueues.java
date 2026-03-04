@@ -3,81 +3,68 @@ package org.example.trafficsim.core;
 import org.example.trafficsim.model.Road;
 import org.example.trafficsim.model.Vehicle;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
-// Vehicles are held in queues per road, per lane. Defaults to 1 lane per road.
+
 public class TrafficQueues {
 
-    private final Map<Road, List<Queue<Vehicle>>> laneQueues = new EnumMap<>(Road.class);
-    private final Map<Road, Integer> lanesPerRoad;
+    private final LaneRegistry laneRegistry;
 
-    // For each lane, stores the simulation step when that lane last had green.
-    private final Map<Road, List<Long>> lastGreenStep = new EnumMap<>(Road.class);
+    private final Queue<Vehicle>[] queues;
+    private long nonEmptyPositionsMask;
 
-    public TrafficQueues(Map<Road, Integer> lanesPerRoad) {
-        this.lanesPerRoad = new EnumMap<>(Road.class);
-        this.lanesPerRoad.putAll(lanesPerRoad);
-
-        for (Road r : Road.values()) {
-            int lanes = this.lanesPerRoad.getOrDefault(r, 1);
-
-            List<Queue<Vehicle>> roadLanes = new ArrayList<>(lanes);
-            for (int i = 0; i < lanes; i++) {
-                roadLanes.add(new ArrayDeque<>());
-            }
-            laneQueues.put(r, roadLanes);
-
-            lastGreenStep.put(r, new ArrayList<>(Collections.nCopies(lanes, 0L)));
+    public TrafficQueues(LaneRegistry laneRegistry) {
+        this.laneRegistry = laneRegistry;
+        int total = laneRegistry.totalPositions();
+        this.queues = new Queue[total];
+        for (int i = 0; i < total; i++) {
+            queues[i] = new ArrayDeque<>();
         }
+        this.nonEmptyPositionsMask = 0;
     }
-    public TrafficQueues() {
-        this(new EnumMap<>(Road.class));
+
+    /** Adds the vehicle to the appropriate queue and returns its positionId. */
+    public int addVehicle(Vehicle v) {
+        int posId = laneRegistry.positionId(v.startRoad(), v.lane());
+        queues[posId].add(v);
+        nonEmptyPositionsMask |= (1L << posId);
+        return posId;
     }
-    public void addVehicle(Vehicle v) {
-        List<Queue<Vehicle>> lanes = laneQueues.get(v.startRoad());
-        int laneIdx = v.lane();
-        if (laneIdx < 0 || laneIdx >= lanes.size()) {
-            throw new IllegalArgumentException(
-                "Vehicle lane " + laneIdx + " out of bounds for road " + v.startRoad() +
-                " (has " + lanes.size() + " lanes)"
-            );
+
+    /** Removes and returns the head vehicle at positionId, updating the bitmask. */
+    public Vehicle poll(int positionId) {
+        Vehicle v = queues[positionId].poll();
+        if (queues[positionId].isEmpty()) {
+            nonEmptyPositionsMask &= ~(1L << positionId);
         }
-        lanes.get(laneIdx).add(v);
+        return v;
     }
 
-    public Vehicle pollSpecificLane(Road r, int laneIdx) {
-        List<Queue<Vehicle>> lanes = laneQueues.get(r);
-        if (laneIdx >= lanes.size()) return null;
-        return lanes.get(laneIdx).poll();
+    /** Returns the head vehicle at positionId without removing it, or null. */
+    public Vehicle peek(int positionId) {
+        return queues[positionId].peek();
     }
 
-    // Marks that the given lane had green at currentStep.
-    public void markGreenNow(Road r, int laneIdx, long currentStep) {
-        List<Long> steps = lastGreenStep.get(r);
-        if (steps == null || laneIdx < 0 || laneIdx >= steps.size()) {
-            return;
-        }
-        steps.set(laneIdx, currentStep);
+    public int queueLength(int positionId) {
+        return queues[positionId].size();
     }
 
-    public int queueLength(Road r, int laneIdx) {
-        List<Queue<Vehicle>> lanes = laneQueues.get(r);
-        if (lanes == null || laneIdx < 0 || laneIdx >= lanes.size()) {
-            return 0;
-        }
-        return lanes.get(laneIdx).size();
+    public long nonEmptyPositionsMask() {
+        return nonEmptyPositionsMask;
     }
 
-    // Returns the number of steps since the given lane last had green.
-    // how many steps have passed since the last opportunity to travel
-    public int stepsSinceGreen(Road r, int laneIdx, long currentStep) {
-        List<Long> steps = lastGreenStep.get(r);
-        if (steps == null || laneIdx < 0 || laneIdx >= steps.size()) {
-            return 0;
-        }
+    // Returns true if there is at least one vehicle in any of the positions indicated by the mask.
+    public boolean hasAnyVehicleInMask(long mask) {
+        return (mask & nonEmptyPositionsMask) != 0;
+    }
 
-        long diff = currentStep - steps.get(laneIdx);
-        return diff > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) diff;
+    public Road roadOf(int positionId) {
+        return laneRegistry.roadOf(positionId);
+    }
+
+    public int[] positionIdsOfRoad(Road road) {
+        return laneRegistry.lanesOf(road);
     }
 
 }
