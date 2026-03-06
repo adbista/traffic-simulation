@@ -1,17 +1,19 @@
-import { WebSocketClient } from './core/websocket-client.js';
-import { CommandFactory } from './app/command-factory.js';
+import { WebSocketClient }      from './core/websocket-client.js';
+import { CommandFactory }       from './app/command-factory.js';
 import { SimulationController } from './app/simulation-controller.js';
-import { VehicleStore } from './app/vehicle-store.js';
-import { cfg } from './app/intersection-config.js';
-import { LogView } from './ui/log-view.js';
-import { StatusView } from './ui/status-view.js';
-import { IntersectionCanvas } from './ui/intersection-canvas.js';
-import { VehicleLayer } from './ui/vehicle-layer.js';
-import { StepHistoryView } from './ui/step-history-view.js';
-import { PhaseView } from './ui/phase-view.js';
-import { getDomElements } from './ui/dom-elements.js';
+import { VehicleStore }         from './app/vehicle-store.js';
+import { cfg }                  from './app/intersection-config.js';
+import { LogView }              from './ui/log-view.js';
+import { StatusView }           from './ui/status-view.js';
+import { IntersectionCanvas }   from './ui/intersection-canvas.js';
+import { VehicleLayer }         from './ui/vehicle-layer.js';
+import { StepHistoryView }      from './ui/step-history-view.js';
+import { PhaseView }            from './ui/phase-view.js';
+import { getDomElements }       from './ui/dom-elements.js';
+
 // DOM
 const dom = getDomElements();
+
 // Auto-set WS URL only when the page is served by the backend itself (same origin).
 {
     const _proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -21,26 +23,31 @@ const dom = getDomElements();
         dom.wsUrl.value = `${_proto}//${location.host}/v1/ws/simulation`;
     }
 }
+
 // Services
-const logger = new LogView(dom.eventLog);
+const logger      = new LogView(dom.eventLog);
 const historyView = new StepHistoryView(dom.stepHistory);
-const phaseView = new PhaseView(dom.phasePanel);
-const store = new VehicleStore();
+const phaseView   = new PhaseView(dom.phasePanel);
+const store       = new VehicleStore();
+
 // Renderers
 const intRenderer = new IntersectionCanvas(dom.intersectionCanvas);
 const vehRenderer = new VehicleLayer(dom.vehicleCanvas, {
     onVehicleGone: (id) => store.evict(id),
 });
+
 // Stats
 let totalLeft = 0;
-function updateStats() {
-    dom.statsSteps.textContent = String(store.getHistory().length);
-    dom.statsLeft.textContent = String(totalLeft);
+function updateStats(): void {
+    dom.statsSteps.textContent  = String(store.getHistory().length);
+    dom.statsLeft.textContent   = String(totalLeft);
     dom.statsQueued.textContent = String(store.getAll().filter(v => v.state === 'waiting').length);
 }
+
 // Animation loop
 let needsRedraw = true;
-function tick(timestamp) {
+
+function tick(timestamp: number): void {
     if (needsRedraw) {
         intRenderer.draw();
         phaseView.render();
@@ -53,42 +60,31 @@ function tick(timestamp) {
 intRenderer.draw();
 phaseView.render();
 requestAnimationFrame(tick);
+
 // Auto-step
-let autoTimer = null;
-function startAutoStep() {
-    if (autoTimer)
-        return;
+let autoTimer: ReturnType<typeof setInterval> | null = null;
+
+function startAutoStep(): void {
+    if (autoTimer) return;
     const ms = Math.max(300, parseInt(dom.autoStepInterval.value, 10) || 1000);
     autoTimer = setInterval(() => {
-        try {
-            controller.step();
-        }
-        catch {
-            stopAutoStep();
-        }
+        try { controller.step(); } catch { stopAutoStep(); }
     }, ms);
 }
-function stopAutoStep() {
-    if (autoTimer) {
-        clearInterval(autoTimer);
-        autoTimer = null;
-    }
+function stopAutoStep(): void {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
     dom.autoStepCheck.checked = false;
 }
+
 dom.autoStepCheck.addEventListener('change', () => {
-    if (dom.autoStepCheck.checked)
-        startAutoStep();
-    else
-        stopAutoStep();
+    if (dom.autoStepCheck.checked) startAutoStep(); else stopAutoStep();
 });
 dom.autoStepInterval.addEventListener('change', () => {
-    if (autoTimer) {
-        stopAutoStep();
-        startAutoStep();
-    }
+    if (autoTimer) { stopAutoStep(); startAutoStep(); }
 });
+
 // Scenario presets
-const SCENARIOS = {
+const SCENARIOS: Record<string, string> = {
     'default': '{}',
     'multilane-ns': JSON.stringify({
         config: {
@@ -97,8 +93,8 @@ const SCENARIOS = {
                 { road: 'north', lane: 1, movements: [{ movement: 'LEFT', type: 'GENERIC', trafficLightId: 'n1' }] },
                 { road: 'south', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 's0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 's0' }] },
                 { road: 'south', lane: 1, movements: [{ movement: 'LEFT', type: 'GENERIC', trafficLightId: 's1' }] },
-                { road: 'east', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }] },
-                { road: 'west', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }] },
+                { road: 'east',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }] },
+                { road: 'west',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }] },
             ],
         },
     }, null, 2),
@@ -109,8 +105,8 @@ const SCENARIOS = {
                 { road: 'north', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'n0' }] },
                 { road: 'north', lane: 1, movements: [{ movement: 'LEFT', type: 'PROTECTED', trafficLightId: 'n1-arrow' }] },
                 { road: 'south', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 's0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 's0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 's0' }] },
-                { road: 'east', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }] },
-                { road: 'west', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }] },
+                { road: 'east',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }] },
+                { road: 'west',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }] },
             ],
         },
     }, null, 2),
@@ -121,36 +117,41 @@ const SCENARIOS = {
                 { road: 'north', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'n0-main' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'n0-main' }] },
                 { road: 'north', lane: 1, movements: [{ movement: 'LEFT', type: 'PROTECTED', trafficLightId: 'n1-arrow' }] },
                 { road: 'south', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 's0-main' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 's0-main' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 's0-main' }] },
-                { road: 'east', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }] },
-                { road: 'west', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }] },
+                { road: 'east',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }] },
+                { road: 'west',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }] },
             ],
         },
     }, null, 2),
 };
+
 dom.scenarioSelect.addEventListener('change', () => {
     const val = dom.scenarioSelect.value;
-    if (SCENARIOS[val] !== undefined)
-        dom.initPayload.value = SCENARIOS[val];
+    if (SCENARIOS[val] !== undefined) dom.initPayload.value = SCENARIOS[val];
 });
+
 // Vehicle form: smart lane/endRoad dropdowns
-const ROAD_CYCLE = ['north', 'west', 'south', 'east'];
-const ROAD_LABEL = {
+const ROAD_CYCLE = ['north', 'west', 'south', 'east'] as const;
+type RoadCycle = typeof ROAD_CYCLE[number];
+const ROAD_LABEL: Record<RoadCycle, string> = {
     north: '\u2191 north',
-    west: '\u2190 west',
+    west:  '\u2190 west',
     south: '\u2193 south',
-    east: '\u2192 east',
+    east:  '\u2192 east',
 };
-const MOVEMENT_OFFSET = { RIGHT: 1, STRAIGHT: 2, LEFT: 3 };
-function movementToEndRoad(fromRoad, movement) {
-    const idx = ROAD_CYCLE.indexOf(fromRoad);
+const MOVEMENT_OFFSET: Record<string, number> = { RIGHT: 1, STRAIGHT: 2, LEFT: 3 };
+
+function movementToEndRoad(fromRoad: string, movement: string): string {
+    const idx = ROAD_CYCLE.indexOf(fromRoad as RoadCycle);
     return ROAD_CYCLE[(idx + MOVEMENT_OFFSET[movement]) % 4];
 }
-function getValidLaneIndices(road) {
-    const lanes = cfg.lanes[road] ?? [];
+
+function getValidLaneIndices(road: string): number[] {
+    const lanes = cfg.lanes[road as RoadCycle] ?? [];
     return lanes.length > 0 ? lanes.map(l => l.laneIndex) : [0];
 }
-function getValidEndRoads(startRoad, laneIndex) {
-    const lanes = cfg.lanes[startRoad] ?? [];
+
+function getValidEndRoads(startRoad: string, laneIndex: number): string[] {
+    const lanes = cfg.lanes[startRoad as RoadCycle] ?? [];
     const laneEntry = lanes[laneIndex];
     if (!laneEntry || laneEntry.signals.length === 0) {
         return ROAD_CYCLE.filter(r => r !== startRoad);
@@ -159,53 +160,59 @@ function getValidEndRoads(startRoad, laneIndex) {
     const ends = [...movements].map(m => movementToEndRoad(startRoad, m));
     return [...new Set(ends)].filter(r => r !== startRoad);
 }
-function updateEndRoadSelect() {
+
+function updateEndRoadSelect(): void {
     const startRoad = dom.startRoad.value;
     const laneIdx = parseInt(dom.lane.value, 10) || 0;
     const validEnds = getValidEndRoads(startRoad, laneIdx);
     const current = dom.endRoad.value;
     dom.endRoad.innerHTML = validEnds
-        .map(r => `<option value="${r}">${ROAD_LABEL[r] ?? r}</option>`)
+        .map(r => `<option value="${r}">${ROAD_LABEL[r as RoadCycle] ?? r}</option>`)
         .join('');
-    if (validEnds.includes(current))
-        dom.endRoad.value = current;
+    if (validEnds.includes(current)) dom.endRoad.value = current;
 }
-function updateVehicleForm() {
+
+function updateVehicleForm(): void {
     const startRoad = dom.startRoad.value;
     const validLanes = getValidLaneIndices(startRoad);
     const currentLane = parseInt(dom.lane.value, 10);
     dom.lane.innerHTML = validLanes.map(i => `<option value="${i}">${i}</option>`).join('');
-    if (validLanes.includes(currentLane))
-        dom.lane.value = String(currentLane);
+    if (validLanes.includes(currentLane)) dom.lane.value = String(currentLane);
     updateEndRoadSelect();
 }
+
 let vehicleCounter = 1;
-function nextVehicleId() { return `v-${vehicleCounter}`; }
+function nextVehicleId(): string { return `v-${vehicleCounter}`; }
+
 dom.startRoad.addEventListener('change', updateVehicleForm);
 dom.lane.addEventListener('change', updateEndRoadSelect);
 updateVehicleForm();
 dom.vehicleId.value = nextVehicleId();
+
 // Status view
 const statusView = new StatusView({
     connectionStatusElement: dom.connectionStatus,
-    initStatusElement: dom.initStatus,
+    initStatusElement:       dom.initStatus,
     controls: {
-        connectBtn: dom.connectBtn,
+        connectBtn:    dom.connectBtn,
         disconnectBtn: dom.disconnectBtn,
-        initBtn: dom.initBtn,
+        initBtn:       dom.initBtn,
         addVehicleBtn: dom.addVehicleBtn,
-        stepBtn: dom.stepBtn,
-        stopBtn: dom.stopBtn,
+        stepBtn:       dom.stepBtn,
+        stopBtn:       dom.stopBtn,
     },
 });
+
 // Controller
-let controller;
+let controller: SimulationController;
+
 const client = new WebSocketClient({
-    onOpen: () => controller.onConnected(),
-    onClose: () => { controller.onClosed(); stopAutoStep(); },
+    onOpen:    () => controller.onConnected(),
+    onClose:   () => { controller.onClosed(); stopAutoStep(); },
     onMessage: (data) => controller.onServerMessage(data),
-    onError: () => controller.onError(),
+    onError:   () => controller.onError(),
 });
+
 controller = new SimulationController({
     client,
     commandFactory: new CommandFactory(),
@@ -213,28 +220,29 @@ controller = new SimulationController({
     statusView,
     vehicleStore: store,
 });
+
 controller.onConfigChanged = () => {
     needsRedraw = true;
     updateVehicleForm();
 };
+
 controller.onStepProcessed = (entry) => {
     totalLeft += entry.leftVehicles.length;
     historyView.addEntry(entry);
     needsRedraw = true;
 };
+
 // Button wiring
 dom.connectBtn.addEventListener('click', () => {
-    try {
-        controller.connect(dom.wsUrl.value.trim());
-    }
-    catch (e) {
-        logger.error(e.message);
-    }
+    try { controller.connect(dom.wsUrl.value.trim()); }
+    catch (e) { logger.error((e as Error).message); }
 });
+
 dom.disconnectBtn.addEventListener('click', () => {
     stopAutoStep();
     controller.disconnect();
 });
+
 dom.initBtn.addEventListener('click', () => {
     try {
         controller.initialize(dom.initPayload.value);
@@ -243,41 +251,27 @@ dom.initBtn.addEventListener('click', () => {
         vehicleCounter = 1;
         historyView.clear();
         dom.vehicleId.value = nextVehicleId();
-    }
-    catch (e) {
-        logger.error(e.message);
-    }
+    } catch (e) { logger.error((e as Error).message); }
 });
+
 dom.addVehicleForm.addEventListener('submit', (e) => {
     e.preventDefault();
     try {
         controller.addVehicle({
             vehicleId: dom.vehicleId.value,
             startRoad: dom.startRoad.value,
-            endRoad: dom.endRoad.value,
-            lane: dom.lane.value,
+            endRoad:   dom.endRoad.value,
+            lane:      dom.lane.value,
         });
         vehicleCounter++;
         dom.vehicleId.value = nextVehicleId();
-    }
-    catch (e) {
-        logger.error(e.message);
-    }
+    } catch (e) { logger.error((e as Error).message); }
 });
+
 dom.stepBtn.addEventListener('click', () => {
-    try {
-        controller.step();
-    }
-    catch (e) {
-        logger.error(e.message);
-    }
+    try { controller.step(); } catch (e) { logger.error((e as Error).message); }
 });
+
 dom.stopBtn.addEventListener('click', () => {
-    try {
-        stopAutoStep();
-        controller.stop();
-    }
-    catch (e) {
-        logger.error(e.message);
-    }
+    try { stopAutoStep(); controller.stop(); } catch (e) { logger.error((e as Error).message); }
 });

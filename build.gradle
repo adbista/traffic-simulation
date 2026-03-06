@@ -45,10 +45,35 @@ tasks.named('bootRun') {
 	mainClass = 'org.example.trafficsim.TrafficsimApplication'
 }
 
+// Compile TypeScript frontend before packaging
+def npmCmd = System.properties['os.name'].toLowerCase(Locale.ROOT).contains('windows') ? 'npm.cmd' : 'npm'
+
+tasks.register('installFrontendDeps', Exec) {
+	workingDir 'web'
+	commandLine npmCmd, 'install', '--prefer-offline'
+	inputs.file('web/package.json')
+	outputs.dir('web/node_modules')
+}
+
+tasks.register('compileFrontend', Exec) {
+	dependsOn 'installFrontendDeps'
+	workingDir 'web'
+	commandLine npmCmd, 'run', 'build'
+	inputs.dir('web/ts')
+	inputs.file('web/tsconfig.json')
+	outputs.dir('web/js')
+}
+
 // Copy web/ frontend into the JAR as static resources so Spring Boot serves it at /
 tasks.named('processResources') {
+	dependsOn 'compileFrontend'
 	from('web') {
 		exclude 'README.md'
+		exclude 'ts/**'
+		exclude 'node_modules/**'
+		exclude 'package.json'
+		exclude 'package-lock.json'
+		exclude 'tsconfig.json'
 		into 'static'
 	}
 }

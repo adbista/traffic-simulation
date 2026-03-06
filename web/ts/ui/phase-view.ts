@@ -1,52 +1,52 @@
-var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
-    if (kind === "m") throw new TypeError("Private method is not writable");
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
-    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
-};
-var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
-    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
-};
-var _PhaseView_el;
 import { cfg } from '../app/intersection-config.js';
-const ROAD_ARROW = {
+import type { PhaseEntry } from '../types.js';
+
+const ROAD_ARROW: Record<string, string> = {
     north: '↑', south: '↓', east: '→', west: '←',
 };
+
 export class PhaseView {
-    constructor(container) {
-        _PhaseView_el.set(this, void 0);
-        __classPrivateFieldSet(this, _PhaseView_el, container, "f");
+    #el: HTMLElement;
+
+    constructor(container: HTMLElement) {
+        this.#el = container;
     }
-    render() {
-        const phases = cfg.phaseList;
-        __classPrivateFieldGet(this, _PhaseView_el, "f").innerHTML = '';
+
+    render(): void {
+        const phases: PhaseEntry[] = cfg.phaseList;
+        this.#el.innerHTML = '';
+
         if (phases.length === 0) {
-            __classPrivateFieldGet(this, _PhaseView_el, "f").innerHTML = '<span class="phase-empty">No phase data available</span>';
+            this.#el.innerHTML = '<span class="phase-empty">No phase data available</span>';
             return;
         }
+
         const header = document.createElement('div');
         header.className = 'phase-summary';
         const activePh = phases.find(p => p.active);
         header.innerHTML =
             `<span class="phase-summary-count">${phases.length} phase${phases.length !== 1 ? 's' : ''}</span>` +
-                (activePh
-                    ? `<span class="phase-summary-active">active: <strong>${activePh.id}</strong></span>`
-                    : '');
-        __classPrivateFieldGet(this, _PhaseView_el, "f").appendChild(header);
+            (activePh
+                ? `<span class="phase-summary-active">active: <strong>${activePh.id}</strong></span>`
+                : '');
+        this.#el.appendChild(header);
+
         for (const phase of phases) {
             const card = document.createElement('div');
             card.className = `phase-card phase-card--${phase.state.toLowerCase()}` +
-                (phase.active ? ' phase-card--active' : '');
+                             (phase.active ? ' phase-card--active' : '');
+
             const cardHead = document.createElement('div');
             cardHead.className = 'phase-card-head';
+
             const idEl = document.createElement('span');
             idEl.className = 'phase-id';
             idEl.textContent = phase.id;
+
             const badge = document.createElement('span');
             badge.className = `phase-state-badge badge-${phase.state.toLowerCase()}`;
             badge.textContent = phase.state;
+
             cardHead.appendChild(idEl);
             cardHead.appendChild(badge);
             if (phase.active) {
@@ -56,6 +56,7 @@ export class PhaseView {
                 cardHead.appendChild(activeMark);
             }
             card.appendChild(cardHead);
+
             const lanesEl = document.createElement('div');
             lanesEl.className = 'phase-lanes';
             for (const { road, laneIndex } of phase.lanes) {
@@ -66,8 +67,7 @@ export class PhaseView {
                 lanesEl.appendChild(laneTag);
             }
             card.appendChild(lanesEl);
-            __classPrivateFieldGet(this, _PhaseView_el, "f").appendChild(card);
+            this.#el.appendChild(card);
         }
     }
 }
-_PhaseView_el = new WeakMap();
