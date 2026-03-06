@@ -247,4 +247,51 @@ void protectedLeftAndOppositeGenericGroups_needTwoPhases() {
 
     assertEquals(colors[0], colors[1]);
 }
+
+@Test
+void jsonConfigCase_shouldProduceTwoPhases() {
+    // From provided JSON:
+    // north lane 0: STRAIGHT+RIGHT (GENERIC), lane 1: LEFT (GENERIC)
+    // south lane 0: STRAIGHT+RIGHT (GENERIC), lane 1: LEFT (GENERIC)
+    // east lane 0: LEFT+STRAIGHT+RIGHT (GENERIC)
+    // west lane 0: LEFT+STRAIGHT+RIGHT (GENERIC)
+
+    LaneSignal n0 = new LaneSignal(Road.NORTH, 0,
+            MovementMask.STRAIGHT | MovementMask.RIGHT, TrafficLightType.GENERIC);
+    LaneSignal n1 = new LaneSignal(Road.NORTH, 1,
+            MovementMask.LEFT, TrafficLightType.GENERIC);
+
+    LaneSignal s0 = new LaneSignal(Road.SOUTH, 0,
+            MovementMask.STRAIGHT | MovementMask.RIGHT, TrafficLightType.GENERIC);
+    LaneSignal s1 = new LaneSignal(Road.SOUTH, 1,
+            MovementMask.LEFT, TrafficLightType.GENERIC);
+
+    LaneSignal e0 = new LaneSignal(Road.EAST, 0,
+            MovementMask.LEFT | MovementMask.STRAIGHT | MovementMask.RIGHT, TrafficLightType.GENERIC);
+    LaneSignal w0 = new LaneSignal(Road.WEST, 0,
+            MovementMask.LEFT | MovementMask.STRAIGHT | MovementMask.RIGHT, TrafficLightType.GENERIC);
+
+    List<LaneSignal> signals = List.of(n0, n1, s0, s1, e0, w0);
+
+    int[] colors = dsatur.color(signals, ConflictMovements::signalsConflict);
+
+    assertAllColored(colors);
+    assertColoringValid(signals, colors);
+
+    long distinctColors = Arrays.stream(colors).distinct().count();
+
+    // We expect 2 phases: NS (all north+south signals) and EW (east+west signals)
+    assertEquals(2, distinctColors,
+            "Expected exactly 2 phases, got colors: " + Arrays.toString(colors)
+                    + " for signals: " + signals);
+
+    // Stronger: all NORTH+SOUTH should share one color, and differ from EAST+WEST
+    assertEquals(colors[0], colors[1], "N0 and N1 should be in the same phase (same road)");
+    assertEquals(colors[2], colors[3], "S0 and S1 should be in the same phase (same road)");
+
+    assertEquals(colors[0], colors[2], "N and S should be compatible -> same phase");
+    assertEquals(colors[4], colors[5], "E and W should be compatible -> same phase");
+
+    assertNotEquals(colors[0], colors[4], "NS phase must differ from EW phase");
+}
 }

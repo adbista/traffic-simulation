@@ -18,7 +18,7 @@ export class LogView {
     append(level, message) {
         const line = document.createElement("div");
         line.className = `log-line ${level}`;
-        const time = new Date().toLocaleTimeString("pl-PL", { hour12: false });
+        const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
         line.textContent = `[${time}] ${message}`;
         this.logElement.prepend(line);
     }

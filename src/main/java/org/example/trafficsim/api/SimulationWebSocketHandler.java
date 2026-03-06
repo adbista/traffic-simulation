@@ -8,7 +8,10 @@ import org.example.trafficsim.config.IntersectionConfig;
 import org.example.trafficsim.core.SimulationEngine;
 import org.example.trafficsim.io.CommandDTO;
 import org.example.trafficsim.io.OutputFile;
+import org.example.trafficsim.io.PhaseInfoDTO;
 import org.example.trafficsim.io.WsInitRequest;
+import org.example.trafficsim.model.LaneSignal;
+import org.example.trafficsim.signal.Phase;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +22,10 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -81,6 +88,8 @@ public class SimulationWebSocketHandler extends TextWebSocketHandler {
        );
        state.initialized = true;
        log.debug("WS session {} initialized", session.getId());
+
+       sendPhasesInfo(session, engine);
     }
 
     private void dispatchCommand(WebSocketSession session,
@@ -88,6 +97,27 @@ public class SimulationWebSocketHandler extends TextWebSocketHandler {
                                  String payload) throws IOException {
         CommandDTO cmd = MAPPER.readValue(payload, CommandDTO.class);
         state.dispatcher.dispatch(cmd);
+    }
+
+    private void sendPhasesInfo(WebSocketSession session, SimulationEngine engine) {
+        List<Phase> phases = engine.getPhases();
+        List<PhaseInfoDTO> dtos = new ArrayList<>();
+        for (Phase phase : phases) {
+            Map<String, PhaseInfoDTO.LaneRef> seen = new LinkedHashMap<>();
+            for (LaneSignal ls : phase.laneSignals()) {
+                String key = ls.road().name() + "-" + ls.laneIndex();
+                seen.putIfAbsent(key, new PhaseInfoDTO.LaneRef(ls.road().name(), ls.laneIndex()));
+            }
+            dtos.add(new PhaseInfoDTO(phase.id(), new ArrayList<>(seen.values())));
+        }
+        try {
+            String json = MAPPER.writeValueAsString(new PhasesFrame(dtos));
+            synchronized (session) {
+                if (session.isOpen()) session.sendMessage(new TextMessage(json));
+            }
+        } catch (IOException e) {
+            log.warn("Failed to send phases info on session {}: {}", session.getId(), e.getMessage());
+        }
     }
 
     private void sendStatus(WebSocketSession session, OutputFile.StepStatus status) {
@@ -139,4 +169,7 @@ public class SimulationWebSocketHandler extends TextWebSocketHandler {
     }
 
     record ErrorFrame(String error) {}
+    record PhasesFrame(String type, List<PhaseInfoDTO> phases) {
+        PhasesFrame(List<PhaseInfoDTO> phases) { this("phases", phases); }
+    }
 }

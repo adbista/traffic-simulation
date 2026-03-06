@@ -14,6 +14,7 @@ public final class Phase {
     private final Map<VehicleSignal, TrafficLightType> signals;
     private final long positionsMask;
     private final int[] allowedMovementMaskByPosition;
+    private final List<LaneSignal> laneSignals;
 
     public Phase(String id, PhaseTiming timing,
                  long positionsMask,
@@ -24,12 +25,14 @@ public final class Phase {
         this.timing = timing;
         this.positionsMask = positionsMask;
         this.allowedMovementMaskByPosition = allowedMovementMaskByPosition;
+        this.laneSignals = List.copyOf(signals);
         this.signals = createVehicleSignalsMap(signals);
     }
 
-    public String id()          { return id; }
-    public PhaseTiming timing() { return timing; }
-    public long positionsMask()  { return positionsMask; }
+    public String id()                     { return id; }
+    public PhaseTiming timing()            { return timing; }
+    public long positionsMask()            { return positionsMask; }
+    public List<LaneSignal> laneSignals()  { return laneSignals; }
 
     public long allowedMask(int positionId) {
         return allowedMovementMaskByPosition[positionId];

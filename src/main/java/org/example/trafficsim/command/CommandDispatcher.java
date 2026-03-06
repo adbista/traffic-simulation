@@ -59,6 +59,10 @@ public class CommandDispatcher {
 
     private void step() {
         StepResult result = engine.step();
-        output.stepStatuses.add(new OutputFile.StepStatus(result.leftVehicles()));
+        output.stepStatuses.add(new OutputFile.StepStatus(
+                result.leftVehicles(),
+                result.activePhaseId(),
+                result.phaseState().name()
+        ));
     }
 }

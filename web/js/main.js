@@ -1,51 +1,125 @@
-/**
- * Composition root — wires all modules together and owns the animation loop.
- * No business logic lives here; this file only connects dependencies.
- */
-import { WebSocketClient }       from './core/websocket-client.js';
-import { CommandFactory }        from './app/command-factory.js';
-import { SimulationController }  from './app/simulation-controller.js';
-import { VehicleStore }          from './app/vehicle-store.js';
-import { LogView }               from './ui/log-view.js';
-import { StatusView }            from './ui/status-view.js';
-import { IntersectionCanvas }    from './ui/intersection-canvas.js';
-import { VehicleLayer }          from './ui/vehicle-layer.js';
-import { StepHistoryView }       from './ui/step-history-view.js';
-import { getDomElements }        from './ui/dom-elements.js';
+﻿import { WebSocketClient }      from './core/websocket-client.js';
+import { CommandFactory }       from './app/command-factory.js';
+import { SimulationController } from './app/simulation-controller.js';
+import { VehicleStore }         from './app/vehicle-store.js';
+import { cfg }                  from './app/intersection-config.js';
+import { LogView }              from './ui/log-view.js';
+import { StatusView }           from './ui/status-view.js';
+import { IntersectionCanvas }   from './ui/intersection-canvas.js';
+import { VehicleLayer }         from './ui/vehicle-layer.js';
+import { StepHistoryView }      from './ui/step-history-view.js';
+import { PhaseView }            from './ui/phase-view.js';
+import { getDomElements }       from './ui/dom-elements.js';
 
-// ── DOM ──────────────────────────────────────────────────────────────────────
+// ── DOM ───────────────────────────────────────────────────────────────────────
 const dom = getDomElements();
+const _proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+dom.wsUrl.value = `${_proto}//${location.host}/v1/ws/simulation`;
 
-// Auto-fill WebSocket URL from current host — works both on :8080 and any other port/host
-const _wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-dom.wsUrl.value = `${_wsProto}//${location.host}/v1/ws/simulation`;
+// ── Services ──────────────────────────────────────────────────────────────────
+const logger      = new LogView(dom.eventLog);
+const historyView = new StepHistoryView(dom.stepHistory);
+const phaseView   = new PhaseView(dom.phasePanel);
+const store       = new VehicleStore();
 
-// ── Services ─────────────────────────────────────────────────────────────────
-const logger       = new LogView(dom.eventLog);
-const historyView  = new StepHistoryView(dom.stepHistory);
-const vehicleStore = new VehicleStore();
-
-// ── Canvas renderers ─────────────────────────────────────────────────────────
-const intersectionRenderer = new IntersectionCanvas(dom.intersectionCanvas);
-const vehicleRenderer      = new VehicleLayer(dom.vehicleCanvas, {
-    onVehicleGone: (id) => vehicleStore.evict(id),
+// ── Renderers ─────────────────────────────────────────────────────────────────
+const intRenderer  = new IntersectionCanvas(dom.intersectionCanvas);
+const vehRenderer  = new VehicleLayer(dom.vehicleCanvas, {
+    onVehicleGone: (id) => store.evict(id),
 });
 
-// ── Animation loop ────────────────────────────────────────────────────────────
-let lastPhase = undefined;
-
-function tick(timestamp) {
-    const phase = vehicleStore.getPhase();
-    if (phase !== lastPhase) {
-        lastPhase = phase;
-        intersectionRenderer.draw(phase);
-    }
-    vehicleRenderer.draw(vehicleStore.getAll(), timestamp);
-    requestAnimationFrame(tick);
+// ── Stats ─────────────────────────────────────────────────────────────────────
+let totalLeft = 0;
+function updateStats() {
+    dom.statsSteps.textContent  = store.getHistory().length;
+    dom.statsLeft.textContent   = totalLeft;
+    dom.statsQueued.textContent = store.getAll().filter(v => v.state === 'waiting').length;
 }
 
-intersectionRenderer.draw(null); // draw static intersection immediately
+// ── Animation loop ────────────────────────────────────────────────────────────
+let needsRedraw = true;
+
+function tick(timestamp) {
+    if (needsRedraw) {
+        intRenderer.draw();
+        phaseView.render();
+        needsRedraw = false;
+    }
+    vehRenderer.draw(store.getAll(), timestamp);
+    updateStats();
+    requestAnimationFrame(tick);
+}
+intRenderer.draw();
+phaseView.render();
 requestAnimationFrame(tick);
+
+// ── Auto-step ─────────────────────────────────────────────────────────────────
+let autoTimer = null;
+
+function startAutoStep() {
+    if (autoTimer) return;
+    const ms = Math.max(300, parseInt(dom.autoStepInterval.value, 10) || 1000);
+    autoTimer = setInterval(() => {
+        try { controller.step(); } catch { stopAutoStep(); }
+    }, ms);
+}
+function stopAutoStep() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    dom.autoStepCheck.checked = false;
+}
+
+dom.autoStepCheck.addEventListener('change', () => {
+    if (dom.autoStepCheck.checked) startAutoStep(); else stopAutoStep();
+});
+dom.autoStepInterval.addEventListener('change', () => {
+    if (autoTimer) { stopAutoStep(); startAutoStep(); }
+});
+
+// ── Scenario presets ──────────────────────────────────────────────────────────
+const SCENARIOS = {
+    'default': '{}',
+    'multilane-ns': JSON.stringify({
+        config: {
+            laneDeclarations: [
+                { road: 'north', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'n0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'n0' }] },
+                { road: 'north', lane: 1, movements: [{ movement: 'LEFT', type: 'GENERIC', trafficLightId: 'n1' }] },
+                { road: 'south', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 's0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 's0' }] },
+                { road: 'south', lane: 1, movements: [{ movement: 'LEFT', type: 'GENERIC', trafficLightId: 's1' }] },
+                { road: 'east',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }] },
+                { road: 'west',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }] },
+            ]
+        }
+    }, null, 2),
+    'protected-left': JSON.stringify({
+        config: {
+            timing: { minGreen: 1, maxGreen: 2, yellow: 0, red: 1 },
+            laneDeclarations: [
+                { road: 'north', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'n0' }] },
+                { road: 'north', lane: 1, movements: [{ movement: 'LEFT', type: 'PROTECTED', trafficLightId: 'n1-arrow' }] },
+                { road: 'south', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 's0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 's0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 's0' }] },
+                { road: 'east',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }] },
+                { road: 'west',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }] },
+            ]
+        }
+    }, null, 2),
+    'grouped-signals': JSON.stringify({
+        config: {
+            timing: { minGreen: 2, maxGreen: 10, yellow: 1, red: 1 },
+            laneDeclarations: [
+                { road: 'north', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'n0-main' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'n0-main' }] },
+                { road: 'north', lane: 1, movements: [{ movement: 'LEFT', type: 'PROTECTED', trafficLightId: 'n1-arrow' }] },
+                { road: 'south', lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 's0-main' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 's0-main' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 's0-main' }] },
+                { road: 'east',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'e0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'e0' }] },
+                { road: 'west',  lane: 0, movements: [{ movement: 'STRAIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'RIGHT', type: 'GENERIC', trafficLightId: 'w0' }, { movement: 'LEFT', type: 'GENERIC', trafficLightId: 'w0' }] },
+            ]
+        }
+    }, null, 2),
+};
+
+dom.scenarioSelect.addEventListener('change', () => {
+    const val = dom.scenarioSelect.value;
+    if (SCENARIOS[val] !== undefined) dom.initPayload.value = SCENARIOS[val];
+});
 
 // ── Status view ───────────────────────────────────────────────────────────────
 const statusView = new StatusView({
@@ -61,12 +135,12 @@ const statusView = new StatusView({
     },
 });
 
-// ── Controller (created last so callbacks can reference it via closure) ───────
+// ── Controller ────────────────────────────────────────────────────────────────
 let controller;
 
 const client = new WebSocketClient({
     onOpen:    () => controller.onConnected(),
-    onClose:   () => controller.onClosed(),
+    onClose:   () => { controller.onClosed(); stopAutoStep(); },
     onMessage: (data) => controller.onServerMessage(data),
     onError:   () => controller.onError(),
 });
@@ -76,45 +150,56 @@ controller = new SimulationController({
     commandFactory: new CommandFactory(),
     logger,
     statusView,
-    vehicleStore,
+    vehicleStore: store,
 });
 
-controller.onStepProcessed = (entry) => historyView.addEntry(entry);
+controller.onConfigChanged = () => {
+    needsRedraw = true;
+};
 
-statusView.setConnected(false);
-logger.info('Aplikacja gotowa — połącz się z backendem i wyślij init.');
+controller.onStepProcessed = (entry) => {
+    totalLeft += entry.leftVehicles.length;
+    historyView.addEntry(entry);
+    needsRedraw = true;
+};
 
-// ── Input handlers ────────────────────────────────────────────────────────────
-function safely(action) {
+// ── Button wiring ─────────────────────────────────────────────────────────────
+dom.connectBtn.addEventListener('click', () => {
+    try { controller.connect(dom.wsUrl.value.trim()); }
+    catch (e) { logger.error(e.message); }
+});
+
+dom.disconnectBtn.addEventListener('click', () => {
+    stopAutoStep();
+    controller.disconnect();
+});
+
+dom.initBtn.addEventListener('click', () => {
     try {
-        action();
-    } catch (err) {
-        logger.error(err.message ?? 'Nieznany błąd.');
-    }
-}
-
-dom.connectBtn.addEventListener('click', () =>
-    safely(() => controller.connect(dom.wsUrl.value.trim())));
-
-dom.disconnectBtn.addEventListener('click', () =>
-    safely(() => controller.disconnect()));
-
-dom.initBtn.addEventListener('click', () =>
-    safely(() => {
         controller.initialize(dom.initPayload.value);
+        store.reset();
+        totalLeft = 0;
         historyView.clear();
-        vehicleStore.reset();
-    }));
+    } catch (e) { logger.error(e.message); }
+});
 
 dom.addVehicleForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    safely(() => controller.addVehicle({
-        vehicleId: dom.vehicleId.value,
-        startRoad: dom.startRoad.value,
-        endRoad:   dom.endRoad.value,
-        lane:      dom.lane.value,
-    }));
+    try {
+        controller.addVehicle({
+            vehicleId: dom.vehicleId.value,
+            startRoad: dom.startRoad.value,
+            endRoad:   dom.endRoad.value,
+            lane:      dom.lane.value,
+        });
+        dom.vehicleId.value = '';
+    } catch (e) { logger.error(e.message); }
 });
 
-dom.stepBtn.addEventListener('click', () => safely(() => controller.step()));
-dom.stopBtn.addEventListener('click', () => safely(() => controller.stop()));
+dom.stepBtn.addEventListener('click', () => {
+    try { controller.step(); } catch (e) { logger.error(e.message); }
+});
+
+dom.stopBtn.addEventListener('click', () => {
+    try { stopAutoStep(); controller.stop(); } catch (e) { logger.error(e.message); }
+});

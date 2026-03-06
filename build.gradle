@@ -36,6 +36,15 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 
+// Use TrafficsimApplication (Spring Boot entry point) for the fat JAR / bootRun.
+// The application.mainClass above is used only for the plain 'run' / distribution tasks.
+tasks.named('bootJar') {
+	mainClass = 'org.example.trafficsim.TrafficsimApplication'
+}
+tasks.named('bootRun') {
+	mainClass = 'org.example.trafficsim.TrafficsimApplication'
+}
+
 // Copy web/ frontend into the JAR as static resources so Spring Boot serves it at /
 tasks.named('processResources') {
 	from('web') {

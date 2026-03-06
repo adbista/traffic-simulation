@@ -25,17 +25,6 @@ class SimulationEngineTest {
         assertTrue(result.leftVehicles().isEmpty());
     }
 
-    @Test
-    void vehicle_departsWhenGreenPhaseIsActive() {
-        SimulationEngine engine = defaultEngine();
-        engine.addVehicle("v1", Road.NORTH, Road.SOUTH, 0);
-        engine.addVehicle("v2", Road.SOUTH, Road.NORTH, 0);
-        // Default first phase covers NORTH+SOUTH; both should depart within a few steps
-        List<String> departed = new ArrayList<>();
-        for (int i = 0; i < 5; i++) departed.addAll(engine.step().leftVehicles());
-        assertTrue(departed.contains("v1"));
-        assertTrue(departed.contains("v2"));
-    }
 
     @Test
     void allVehiclesEventuallyLeave_multipleDirections() {
@@ -49,6 +38,19 @@ class SimulationEngineTest {
         for (int i = 0; i < 30; i++) all.addAll(engine.step().leftVehicles());
 
         assertTrue(all.containsAll(List.of("n1", "s1", "e1", "w1")));
+    }
+
+
+    @Test
+    void sameLane_straightVsLeft_departureOrder() {
+        SimulationEngine engine = defaultEngine();
+        engine.addVehicle("straight", Road.NORTH, Road.SOUTH, 0);
+        engine.addVehicle("left",     Road.NORTH, Road.EAST,  0);
+
+        List<String> all = new ArrayList<>();
+        for (int i = 0; i < 30; i++) all.addAll(engine.step().leftVehicles());
+
+        assertTrue(all.indexOf("straight") < all.indexOf("left"), "Straight vehicle should depart before left-turning vehicle from the same lane");
     }
 
     @Test

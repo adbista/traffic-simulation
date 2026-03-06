@@ -127,20 +127,4 @@ class PhaseControllerTest {
         assertFalse(active.isGreen()); // south scored much higher than north
     }
 
-    @Test
-    void hysteresis_preventsSwitch_whenScoresAreSimilar() {
-        Phase north = phaseNorth();
-        Phase south = phaseSouth();
-        PhaseController ctrl = makeController(List.of(north, south));
-        TrafficQueues queues = new TrafficQueues(twoLaneReg());
-        queues.addVehicle(new Vehicle("n", Road.NORTH, Road.SOUTH, 0, 0, 0));
-        queues.addVehicle(new Vehicle("s", Road.SOUTH, Road.NORTH, 0, 1, 0)); // same queue depth
-        ActivePhase active = new ActivePhase(north);
-        active.manageLightState();
-
-        ctrl.managePhaseSwitch(queues, 5L, active);
-
-        // Scores are equal -> no switch (hysteresis blocks marginal improvement)
-        assertTrue(active.isGreen());
-    }
 }

@@ -18,7 +18,11 @@ public class StreamingCommandDispatcher extends CommandDispatcher {
         // Override "step": emit immediately instead of collecting
         registerHandler("step", c -> {
             StepResult result = engine.step();
-            emitter.accept(new OutputFile.StepStatus(result.leftVehicles()));
+            emitter.accept(new OutputFile.StepStatus(
+                    result.leftVehicles(),
+                    result.activePhaseId(),
+                    result.phaseState().name()
+            ));
         });
 
         // New command: stop the streaming session

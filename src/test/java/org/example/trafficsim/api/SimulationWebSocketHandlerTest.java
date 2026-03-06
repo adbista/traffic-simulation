@@ -70,6 +70,18 @@ class SimulationWebSocketHandlerTest {
         return new Connection(session, messages);
     }
 
+    /**
+     * Sends the init payload and drains the server's phases-info response that is
+     * sent immediately after successful initialization.  Returns the phases JSON.
+     */
+    private String sendInit(Connection conn, String initJson) throws Exception {
+        conn.session().sendMessage(new TextMessage(initJson));
+        String phases = conn.messages().poll(5, TimeUnit.SECONDS);
+        assertNotNull(phases, "Expected phases info frame after init");
+        assertThat(phases).contains("\"type\":\"phases\"");
+        return phases;
+    }
+
     // happy-path tests
 
     @Test
@@ -78,7 +90,7 @@ class SimulationWebSocketHandlerTest {
         var conn = connect();
 
         // 1. Init with default config (no laneDeclarations → defaults)
-        conn.session().sendMessage(new TextMessage("{}"));
+        sendInit(conn, "{}");
 
         // 2. Add a vehicle going STRAIGHT: south → north
         conn.session().sendMessage(new TextMessage(
@@ -101,7 +113,7 @@ class SimulationWebSocketHandlerTest {
     void twoVehiclesDifferentRoads_bothDepart() throws Exception {
         var conn = connect();
 
-        conn.session().sendMessage(new TextMessage("{}"));
+        sendInit(conn, "{}");
 
         // v1: south->north
         // v2: west->south
@@ -136,7 +148,7 @@ class SimulationWebSocketHandlerTest {
         var conn = connect();
 
         // Init with explicit lanes using the new {movement, type, trafficLightId} format
-        conn.session().sendMessage(new TextMessage("""
+        sendInit(conn, """
                 {
                   "config": {
                     "laneDeclarations": [
@@ -147,7 +159,7 @@ class SimulationWebSocketHandlerTest {
                     ]
                   }
                 }
-                """));
+                """);
 
         conn.session().sendMessage(new TextMessage(
                 "{\"type\":\"addVehicle\",\"vehicleId\":\"vN\",\"startRoad\":\"north\",\"endRoad\":\"south\"}"
@@ -166,7 +178,7 @@ class SimulationWebSocketHandlerTest {
     void protectedLeftConfig_vehicleDeparts() throws Exception {
         var conn = connect();
 
-        conn.session().sendMessage(new TextMessage("""
+        sendInit(conn, """
                 {
                   "config": {
                     "timing": {"minGreen": 1, "maxGreen": 2, "yellow": 0, "red": 1},
@@ -178,7 +190,7 @@ class SimulationWebSocketHandlerTest {
                     ]
                   }
                 }
-                """));
+                """);
 
         conn.session().sendMessage(new TextMessage(
                 "{\"type\":\"addVehicle\",\"vehicleId\":\"vProt\",\"startRoad\":\"north\",\"endRoad\":\"east\",\"lane\":1}"
@@ -222,7 +234,8 @@ class SimulationWebSocketHandlerTest {
                 }, wsUrl())
                 .thenAccept(session -> {
                     try {
-                        session.sendMessage(new TextMessage("{}"));                          // init
+                        session.sendMessage(new TextMessage("{}"));                          // init (phases frame comes back, but we don't wait for it in this test)
+                        Thread.sleep(200);                                                    // let phases frame arrive first
                         session.sendMessage(new TextMessage("{\"type\":\"flyVehicle\"}")); // bad command
                     } catch (Exception e) {
                         throw new RuntimeException(e);
@@ -231,7 +244,12 @@ class SimulationWebSocketHandlerTest {
 
         assertTrue(closed.await(5, TimeUnit.SECONDS), "Session should close after error");
 
-        String errorMsg = messages.poll(1, TimeUnit.SECONDS);
+        // Drain any phases-info frame that arrived after init, then find the error frame
+        String errorMsg = null;
+        for (int i = 0; i < 3; i++) {
+            String msg = messages.poll(1, TimeUnit.SECONDS);
+            if (msg != null && msg.contains("\"error\"")) { errorMsg = msg; break; }
+        }
         assertNotNull(errorMsg, "Expected an error frame before the session closed");
         assertThat(errorMsg).contains("error");
     }

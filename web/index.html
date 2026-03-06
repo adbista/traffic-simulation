@@ -1,5 +1,5 @@
-<!doctype html>
-<html lang="pl">
+﻿<!doctype html>
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,43 +10,54 @@
 
 <header class="header">
     <div class="header-title">
-        <span class="header-icon">&#127942;</span>
+        <span class="header-icon">&#x1F6A6;</span>
         <h1>Traffic Simulation</h1>
+        <span class="header-subtitle">Intelligent Intersection Control</span>
     </div>
     <div class="header-status">
-        <span id="connectionStatus" class="status status-offline">Roz&#322;&#261;czono</span>
-        <span id="initStatus"       class="status status-offline">Brak sesji</span>
+        <span id="connectionStatus" class="status status-offline">Disconnected</span>
+        <span id="initStatus"       class="status status-offline">No session</span>
     </div>
 </header>
 
 <div class="layout">
 
-    <!-- ── LEFT: Controls ── -->
+    <!-- ── LEFT COLUMN: Controls ── -->
     <aside class="controls">
 
         <section class="panel">
-            <h2>&#128279; Po&#322;&#261;czenie</h2>
+            <h2 class="panel-title">&#x1F517; Connection</h2>
             <div class="field">
                 <label for="wsUrl">WebSocket URL</label>
                 <input id="wsUrl" type="text" value="ws://localhost:8080/v1/ws/simulation" />
             </div>
             <div class="btn-row">
-                <button id="connectBtn"    type="button" class="btn-primary">Po&#322;&#261;cz</button>
-                <button id="disconnectBtn" type="button" class="btn-danger"  disabled>Roz&#322;&#261;cz</button>
+                <button id="connectBtn"    type="button" class="btn-primary">&#x25B6; Connect</button>
+                <button id="disconnectBtn" type="button" class="btn-danger"  disabled>&#x25A0; Disconnect</button>
             </div>
         </section>
 
         <section class="panel">
-            <h2>&#9881;&#65039; Inicjalizacja sesji</h2>
+            <h2 class="panel-title">&#x2699; Session init</h2>
+            <div class="field">
+                <label for="scenarioSelect">Scenario (preset)</label>
+                <select id="scenarioSelect">
+                    <option value="">— select or type manually —</option>
+                    <option value="default">01 · Default (1 lane, GENERIC)</option>
+                    <option value="multilane-ns">03 · Multi-lane N/S</option>
+                    <option value="protected-left">04 · Protected LEFT</option>
+                    <option value="grouped-signals">05 · Grouped signals</option>
+                </select>
+            </div>
             <div class="field">
                 <label for="initPayload">WsInitRequest JSON</label>
-                <textarea id="initPayload" rows="5">{}</textarea>
+                <textarea id="initPayload" rows="6">{}</textarea>
             </div>
-            <button id="initBtn" type="button" class="btn-primary w-full" disabled>Wy&#347;lij init</button>
+            <button id="initBtn" type="button" class="btn-primary w-full" disabled>Send init</button>
         </section>
 
         <section class="panel">
-            <h2>&#128663; Dodaj pojazd</h2>
+            <h2 class="panel-title">&#x1F697; Add vehicle</h2>
             <form id="addVehicleForm">
                 <div class="grid-2">
                     <div class="field">
@@ -54,8 +65,8 @@
                         <input id="vehicleId" type="text" placeholder="v1" required />
                     </div>
                     <div class="field">
-                        <label for="lane">lane (opt.)</label>
-                        <input id="lane" type="number" min="0" placeholder="&#8212;" />
+                        <label for="lane">lane</label>
+                        <input id="lane" type="number" min="0" placeholder="0" />
                     </div>
                     <div class="field">
                         <label for="startRoad">startRoad</label>
@@ -76,43 +87,87 @@
                         </select>
                     </div>
                 </div>
-                <button id="addVehicleBtn" type="submit" class="btn-primary w-full" disabled>
-                    + Dodaj pojazd
+                <button id="addVehicleBtn" type="submit" class="btn-accent w-full" disabled>
+                    + Add vehicle
                 </button>
             </form>
         </section>
 
         <section class="panel">
-            <h2>&#9654; Sterowanie</h2>
+            <h2 class="panel-title">&#x25B6; Control</h2>
             <div class="btn-row">
-                <button id="stepBtn" type="button" class="btn-secondary" disabled>Step &#8594;</button>
-                <button id="stopBtn" type="button" class="btn-danger"    disabled>Stop &#9632;</button>
+                <button id="stepBtn" type="button" class="btn-secondary" disabled>Step &#x2192;</button>
+                <button id="stopBtn" type="button" class="btn-danger"    disabled>Stop &#x25A0;</button>
+            </div>
+            <div class="field mt-8">
+                <label class="checkbox-label">
+                    <input id="autoStepCheck" type="checkbox" />
+                    Auto-step
+                </label>
+            </div>
+            <div class="field">
+                <label for="autoStepInterval">Interval (ms)</label>
+                <input id="autoStepInterval" type="number" min="300" step="100" value="1000" />
+            </div>
+        </section>
+
+        <section class="panel stats-panel">
+            <h2 class="panel-title">&#x1F4CA; Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-cell">
+                    <span class="stat-value" id="statsSteps">0</span>
+                    <span class="stat-label">Steps</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-value" id="statsLeft">0</span>
+                    <span class="stat-label">Departed</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-value" id="statsQueued">0</span>
+                    <span class="stat-label">Queued</span>
+                </div>
             </div>
         </section>
 
         <section class="panel">
-            <h2>&#128196; Log zdarze&#324;</h2>
+            <h2 class="panel-title">&#x1F4C3; Event log</h2>
             <div id="eventLog" class="log"></div>
         </section>
 
     </aside>
 
-    <!-- ── RIGHT: Visualisation ── -->
+    <!-- ── CENTER: Canvas ── -->
     <div class="visualisation">
         <div class="canvas-wrapper">
-            <canvas id="intersectionCanvas" width="600" height="600"></canvas>
-            <canvas id="vehicleCanvas"      width="600" height="600"></canvas>
-            <span class="road-label label-north">N</span>
-            <span class="road-label label-south">S</span>
-            <span class="road-label label-west">W</span>
-            <span class="road-label label-east">E</span>
+            <canvas id="intersectionCanvas"></canvas>
+            <canvas id="vehicleCanvas"></canvas>
         </div>
 
         <section class="panel history-panel">
-            <h2>&#128260; Historia krok&#243;w (odpowiedzi serwera)</h2>
+            <h2 class="panel-title">&#x1F504; Step history</h2>
             <div id="stepHistory" class="step-history"></div>
         </section>
     </div>
+
+    <!-- ── RIGHT: Phase panel ── -->
+    <aside class="signal-sidebar">
+        <section class="panel phase-panel-section">
+            <h2 class="panel-title">&#x1F6A6; Signal phases</h2>
+            <div id="phasePanel" class="phase-panel">
+                <span class="phase-empty">No phase data available</span>
+            </div>
+        </section>
+
+        <section class="panel mt-8">
+            <h2 class="panel-title">&#x2139; Legend</h2>
+            <ul class="legend-list">
+                <li><span class="road-badge road-north">N</span> North — vehicles go to S</li>
+                <li><span class="road-badge road-south">S</span> South — vehicles go to N</li>
+                <li><span class="road-badge road-east">E</span> East &nbsp;— vehicles go to W</li>
+                <li><span class="road-badge road-west">W</span> West &nbsp;— vehicles go to E</li>
+            </ul>
+        </section>
+    </aside>
 
 </div>
 
