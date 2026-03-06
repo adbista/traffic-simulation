@@ -220,6 +220,11 @@ Available at `http://localhost:8080` / `ws://localhost:8080/v1/ws/simulation`.
 
 ## Web client
 
+**Recommended**:
+You can run the spring boot app using 
+`./gradlew bootRun --args="--server.port=8080"` and then open `http://localhost:8080` to access the web client.
+
+**Alternative** (serving static files with Python):
 ```bash
 # 1. Start the backend (locally or in Docker)
 # 2. Serve the frontend
@@ -227,7 +232,7 @@ python -m http.server 5500 --directory web
 # 3. Open http://localhost:5500
 ```
 
-See `web/README.md` for details.
+
 
 ## E2E tests (Docker Compose)
 
