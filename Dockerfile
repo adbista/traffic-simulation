@@ -16,7 +16,7 @@ COPY . .
 RUN rm -rf /workspace/src/main/resources/static/*
 COPY --from=frontend-builder /frontend/index.html /workspace/src/main/resources/static/index.html
 COPY --from=frontend-builder /frontend/js /workspace/src/main/resources/static/js
-COPY --from=frontend-builder /frontend/styles.css /workspace/src/main/resources/static/styles.css
+COPY --from=frontend-builder /frontend/css /workspace/src/main/resources/static/css
 
 RUN chmod +x ./gradlew && ./gradlew --no-daemon clean bootJar
 
