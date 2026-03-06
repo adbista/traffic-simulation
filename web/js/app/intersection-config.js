@@ -21,7 +21,7 @@ export const ROAD_COLOR = {
     west:  '#4ade80',
 };
 
-// ── Internal mutable config class ─────────────────────────────────────────────
+// Internal mutable config class
 class IntersectionConfig {
     constructor() {
         this._init(null);
@@ -137,7 +137,7 @@ class IntersectionConfig {
         };
     }
 
-    // ── Geometry helpers ────────────────────────────────────────────────────
+    // Geometry helpers
 
     /** X (for N/S) or Y (for E/W) coordinate of inbound lane centre. */
     laneCenter(road, laneIndex = 0) {
@@ -166,7 +166,7 @@ class IntersectionConfig {
         return Math.max(this.lanes[road?.toLowerCase()]?.length || 0, 1);
     }
 
-    // ── Signal state management ──────────────────────────────────────────────
+    // Signal state management
 
     setAllRed() {
         for (const l of this.lights.values()) l.state = 'RED';
@@ -240,7 +240,7 @@ class IntersectionConfig {
         for (const { road, lane } of vehicles) {
             const laneEntry = this.lanes[road.toLowerCase()]?.[lane ?? 0];
             if (!laneEntry) {
-                // Fallback – green all lights on that road
+                // Fallback - green all lights on that road
                 for (const l of this.lights.values()) {
                     if (l.road === road.toLowerCase()) this.setGreen(l.id);
                 }
@@ -257,6 +257,6 @@ class IntersectionConfig {
     }
 }
 
-// ── Shared singleton ──────────────────────────────────────────────────────────
+// Shared singleton
 /** Shared singleton used by all renderer/logic modules. Mutate via cfg.reset(). */
 export const cfg = new IntersectionConfig();

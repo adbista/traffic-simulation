@@ -11,24 +11,24 @@ import { StepHistoryView }      from './ui/step-history-view.js';
 import { PhaseView }            from './ui/phase-view.js';
 import { getDomElements }       from './ui/dom-elements.js';
 
-// ── DOM ───────────────────────────────────────────────────────────────────────
+// DOM
 const dom = getDomElements();
 const _proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
 dom.wsUrl.value = `${_proto}//${location.host}/v1/ws/simulation`;
 
-// ── Services ──────────────────────────────────────────────────────────────────
+// Services
 const logger      = new LogView(dom.eventLog);
 const historyView = new StepHistoryView(dom.stepHistory);
 const phaseView   = new PhaseView(dom.phasePanel);
 const store       = new VehicleStore();
 
-// ── Renderers ─────────────────────────────────────────────────────────────────
+// Renderers
 const intRenderer  = new IntersectionCanvas(dom.intersectionCanvas);
 const vehRenderer  = new VehicleLayer(dom.vehicleCanvas, {
     onVehicleGone: (id) => store.evict(id),
 });
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
+// Stats
 let totalLeft = 0;
 function updateStats() {
     dom.statsSteps.textContent  = store.getHistory().length;
@@ -36,7 +36,7 @@ function updateStats() {
     dom.statsQueued.textContent = store.getAll().filter(v => v.state === 'waiting').length;
 }
 
-// ── Animation loop ────────────────────────────────────────────────────────────
+// Animation loop
 let needsRedraw = true;
 
 function tick(timestamp) {
@@ -53,7 +53,7 @@ intRenderer.draw();
 phaseView.render();
 requestAnimationFrame(tick);
 
-// ── Auto-step ─────────────────────────────────────────────────────────────────
+// Auto-step
 let autoTimer = null;
 
 function startAutoStep() {
@@ -75,7 +75,7 @@ dom.autoStepInterval.addEventListener('change', () => {
     if (autoTimer) { stopAutoStep(); startAutoStep(); }
 });
 
-// ── Scenario presets ──────────────────────────────────────────────────────────
+// Scenario presets
 const SCENARIOS = {
     'default': '{}',
     'multilane-ns': JSON.stringify({
@@ -121,7 +121,7 @@ dom.scenarioSelect.addEventListener('change', () => {
     if (SCENARIOS[val] !== undefined) dom.initPayload.value = SCENARIOS[val];
 });
 
-// ── Status view ───────────────────────────────────────────────────────────────
+// Status view
 const statusView = new StatusView({
     connectionStatusElement: dom.connectionStatus,
     initStatusElement:       dom.initStatus,
@@ -135,7 +135,7 @@ const statusView = new StatusView({
     },
 });
 
-// ── Controller ────────────────────────────────────────────────────────────────
+// Controller
 let controller;
 
 const client = new WebSocketClient({
@@ -163,7 +163,7 @@ controller.onStepProcessed = (entry) => {
     needsRedraw = true;
 };
 
-// ── Button wiring ─────────────────────────────────────────────────────────────
+// Button wiring
 dom.connectBtn.addEventListener('click', () => {
     try { controller.connect(dom.wsUrl.value.trim()); }
     catch (e) { logger.error(e.message); }
