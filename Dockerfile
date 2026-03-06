@@ -1,4 +1,4 @@
-FROM node:20-bookworm AS frontend-builder
+FROM node:24-bookworm-slim AS frontend-builder
 WORKDIR /frontend
 
 COPY web/package*.json ./
@@ -7,19 +7,17 @@ RUN npm ci
 COPY web ./
 RUN npm run build
 
-
 FROM eclipse-temurin:17-jdk-jammy AS backend-builder
 WORKDIR /workspace
 
 COPY . .
 
-RUN rm -rf /workspace/src/main/resources/static/*
-COPY --from=frontend-builder /frontend/index.html /workspace/src/main/resources/static/index.html
-COPY --from=frontend-builder /frontend/js /workspace/src/main/resources/static/js
-COPY --from=frontend-builder /frontend/css /workspace/src/main/resources/static/css
+RUN rm -rf /workspace/web/js /workspace/web/css
+COPY --from=frontend-builder /frontend/index.html /workspace/web/index.html
+COPY --from=frontend-builder /frontend/js /workspace/web/js
+COPY --from=frontend-builder /frontend/css /workspace/web/css
 
 RUN chmod +x ./gradlew && ./gradlew --no-daemon clean bootJar
-
 
 FROM gcr.io/distroless/java17-debian12:nonroot
 WORKDIR /app
