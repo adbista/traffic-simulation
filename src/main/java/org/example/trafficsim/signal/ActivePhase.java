@@ -36,7 +36,6 @@ public class ActivePhase {
 
         this.pendingNextPhase = nextPhase;
 
-        PhaseState prev = this.state;
         this.state = (current.timing().yellowSteps() > 0) ? PhaseState.YELLOW : PhaseState.RED;
         this.timeInState = 0;
     }

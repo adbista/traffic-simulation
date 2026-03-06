@@ -1,7 +1,6 @@
 # Traffic Simulation
 
-This project simulates adaptive traffic lights at a four-way intersection. The system
-adjusts signal cycles based on real-time vehicle queues and arrival rates. It is written in Java 17 with Spring Boot and can be driven either by a JSON command file (CLI) or through a REST / WebSocket API.
+Adaptive traffic-light simulator for a four-way intersection. Written in Java 17 / Spring Boot. Accepts commands either from a JSON file (CLI) or via REST / WebSocket.
 
 ---
 
@@ -9,170 +8,130 @@ adjusts signal cycles based on real-time vehicle queues and arrival rates. It is
 
 ### Intersection model
 
-The intersection has four approach roads: NORTH, WEST, SOUTH, EAST. Each road may have one or more lanes. Each lane carries a set of movements (STRAIGHT, LEFT, RIGHT) and each
-movement is tagged with a signal type:
+Four approach roads: NORTH, WEST, SOUTH, EAST. Each road has one or more lanes; each lane declares one or more movements (STRAIGHT, LEFT, RIGHT) with a signal type:
 
-- GENERIC: the light permits the movement but a left-turning vehicle must still yield to
-  oncoming straight/right traffic at runtime (unprotected left).
-- PROTECTED: the light guarantees geometric safety; no runtime yield check is needed.
+- **GENERIC** — light permits the movement; a left-turning vehicle still yields to oncoming straight/right traffic at runtime.
+- **PROTECTED** — geometric safety is guaranteed by the phase schedule; no runtime yield needed.
 
 ### Traffic light IDs and signal grouping
 
-Every movement declaration in a lane carries a `trafficLightId` string. This ID is the way you tell the system which movements share a single physical traffic light on that lane. All movements on the same lane that share the same `trafficLightId` are
-merged into one signal group. Their movement bits are OR-ed together into a single bitmask and they get exactly one `LaneSignal` entry. The `type` (GENERIC or PROTECTED) is taken from the first declaration in that group.
+Each movement in a lane declaration carries a `trafficLightId`. Movements on the **same lane** that share an ID are merged into one `LaneSignal` (their movement bits are OR-ed into a bitmask). Movements with **different IDs** produce independent signals that may end up in different phases.
 
-Example: same ID, movements merged into one signal
-
+Same ID → one signal:
 ```json
 { "road": "north", "lane": 0, "movements": [
     { "movement": "LEFT",  "type": "GENERIC", "trafficLightId": "t1" },
     { "movement": "RIGHT", "type": "GENERIC", "trafficLightId": "t1" }
 ]}
 ```
+Result: `LaneSignal(NORTH, lane=0, mask=LEFT|RIGHT, GENERIC)`.
 
-Result: one LaneSignal(NORTH, lane=0, mask=LEFT|RIGHT, GENERIC). Both movements are
-controlled by the same physical light. When that light is green, both LEFT and RIGHT are
-permissible on that lane (subject to runtime yield for the LEFT). Please do not use same id when you have different signal types.
-
-Example: different IDs, two independent signals
-
+Different IDs → two independent signals (can be in separate phases):
 ```json
 { "road": "north", "lane": 0, "movements": [
     { "movement": "LEFT",  "type": "GENERIC",   "trafficLightId": "t1" },
     { "movement": "RIGHT", "type": "PROTECTED", "trafficLightId": "t2" }
 ]}
 ```
+Do not reuse the same ID for movements with different signal types.
 
-Result: two separate LaneSignals on the same lane. The DSATUR algorithm treats them as
-independent nodes in the conflict graph. They may end up in different phases (but not for sure) , meaning LEFT and RIGHT on the same physical lane can be green at different times. This is the way to model an intersection where a dedicated arrow controls one direction independently from the general signal on the same lane.
+### Lane weights
 
-### Lane priorities
+Each lane can have a numeric `weight` (default `1.0`) that scales its contribution in the scoring function. A higher weight (e.g. `2.0` for a bus lane) makes the controller prefer that lane when choosing the next phase. It does not affect conflict detection.
 
-Each position (road + lane index) can be assigned a numeric weight. This weight is a
-multiplier applied to the scoring function for that position:
+### Phase generation — DSATUR graph coloring
 
-    score(P) += lane_weight[i] * (flow_weight * EMA[i] + queue_weight * queue[i] + ageW * age[i])
+Two signals can share a phase only if they do not geometrically conflict. This is modeled as graph coloring: each `LaneSignal` is a node; an edge means the two signals cannot be green simultaneously. Each color maps to one phase.
 
-The default weight for every lane is 1.0. Setting a higher value (for example 2.0 for a bus lane) makes the controller prefer that lane more strongly when deciding which phase to activate next. The weight does not affect conflict detection or the light cycle mechanics; it only influences how urgently the system wants to serve that lane relative to others.
+The system uses **DSATUR** (Degree of Saturation):
 
-Weights are configured per lane in the `laneDeclarations` block using the `weight` field. If omitted the default of 1.0 is used.
+1. Build the conflict graph.
+2. Select the next uncolored node by:
+   - **Highest saturation** — the number of *distinct colors already assigned to its neighbors*. A highly saturated node has fewer legal colors left and must be placed first to avoid dead-ends.
+   - **Tie-break: highest degree** — among equally saturated nodes, pick the one with the most neighbors (uncolored or not). Dense nodes are more constrained; placing them early keeps future choices feasible.
+3. Assign the lowest-numbered color not used by any neighbor.
+4. Repeat until all nodes are colored. Each color group becomes one phase.
 
-### Automatic phase generation with DSATUR graph coloring
+Complexity: O(V³) where V = number of signals, paid once at startup.
 
-Before the simulation starts, the system automatically builds a conflict-free set of phases from the lane configuration. The key insight is that two signals can share a phase only if they do not geometrically conflict with each other.
-
-This is modeled as a graph coloring problem. Each lane signal is a node. An edge between two nodes means they cannot be active simultaneously. Each color produced by the algorithm is one traffic phase.
-
-The system uses DSATUR (Degree of Saturation), a greedy heuristic that gives near-optimal
-colorings on sparse conflict graphs:
-
-1. Build the conflict graph for all lane signals.
-2. Iteratively pick the uncolored node with the highest saturation (number of distinct colors
-   already seen among its neighbors). Break ties by the number of remaining uncolored
-   neighbors.
-3. Assign the smallest color not used by any neighbor.
-4. Each resulting color group becomes one phase; signals in the same phase all get green at the same time.
-
-DSATUR complexity is O(V^3) where V is the number of lane signals. 
-
-Conflict rules (ConflictMovements):
-- Same road: never conflict (different lanes on the same road can run together).
-- Perpendicular roads: always conflict (crossing paths).
-- Opposite roads with at least one PROTECTED signal: geometric check applies. STRAIGHT vs
-  STRAIGHT is fine; PROTECTED LEFT vs any oncoming movement is a conflict.
-- Opposite roads, both GENERIC: no static conflict; a left-turning vehicle must yield at
-  runtime instead.
-
-It can be adjusted as we want to support more complex scenarios in the future.
+Conflict rules:
+- **Same road**: never conflict.
+- **Perpendicular roads**: always conflict (crossing paths).
+- **Opposite roads, >= 1 PROTECTED**: STRAIGHT vs STRAIGHT is safe; PROTECTED LEFT vs any oncoming signal conflicts.
+- **Opposite roads, both GENERIC**: no static conflict; left-turner yields at runtime.
 
 ### Phase scoring
 
-Every simulation step, after departures are processed, the PhaseController evaluates each phase with a scoring function:
+After each departure step the controller scores every phase to decide what to activate next:
 
-    score(P) = sum over position i in P of:
-        lane_weight[i] * (flow_weight * EMA[i] + queue_weight * queue[i] + age_weight * min(age[i], age_cap))
+    score(P) = Σ  lane_weight[i] × (10·EMA[i] + 1·queue[i] + 0.01·min(age[i], 200))
 
-Default weights: flow_weight = 10.0, queue_weight = 1.0, age_weight = 0.01, age_cap = 200.
+The sum runs over all positions (road + lane) that belong to phase P.
 
-- EMA[i]: exponential moving average of vehicle arrivals at lane i. Tracks the underlying
-  traffic trend rather than noisy per-step counts.
-- queue[i]: number of vehicles waiting at lane i, providing a direct measure of current
-  congestion.
-- age[i]: number of steps since lane i last had a green light, capped at age_cap. This is
-  the anti-starvation component; it ensures no lane waits forever, but the cap prevents very old lanes from dominating the score indefinitely.
+**Components:**
 
-Positions with an empty queue and no incoming flow contribute zero to the score, so the
-system never awards green time to a lane that has nothing to serve.
+- **EMA[i]** (`β = 0.10`) — exponential moving average of vehicle arrivals:  
+  `EMA_t = (1 − β)·EMA_(t−1) + β·arrivals_t`  
+  Tracks the *trend* of incoming traffic rather than noisy per-step counts. Weight **10** makes it the dominant signal: a lane with steady throughput will always score high even when its queue is temporarily empty.
 
-Lane weights allow the operator to give priority to certain lanes (for example a bus lane or a high-volume arterial).
+- **queue[i]** — number of vehicles currently waiting at lane i. Captures *immediate* congestion. Weight **1** keeps it secondary to the trend, so a transient burst does not override a consistently busy lane.
 
-### EMA flow tracking
+- **age[i]** — number of steps since lane i last received green, capped at 200. Provides *anti-starvation*: a lane that has been waiting a long time gradually accumulates score so it cannot be ignored forever. The cap prevents a very stale lane from dominating the score once it reaches the ceiling.
 
-Vehicle arrival rate is tracked using an exponential moving average (EMA):
+- **lane_weight[i]** — per-lane multiplier (default `1.0`). Lets the operator permanently boost a lane (e.g. `2.0` for a bus lane) without touching the other weights.
 
-    EMA_t = (1 - beta) * EMA_(t-1) + beta * arrivals_t
-
-- arrivals_t: number of new vehicles that arrived at the lane during step t.
-- EMA_(t-1): the previous EMA value for that lane.
-
-Default beta = 0.10, which smooths over roughly ten steps. A higher beta reacts faster but is more sensitive to temporary spikes. A lower beta gives a more stable estimate but adapts more slowly to changes in traffic demand.
+Lanes with zero queue and zero EMA contribute nothing, so the controller never awards green time to an empty phase.
 
 ### Phase controller logic
 
-The PhaseController runs once per step and decides whether to switch phases. The decision
-process is:
+Each step (only while current phase is GREEN):
 
-1. Do nothing if the current phase is not GREEN. No decisions during YELLOW or all-RED.
-2. Respect minimum green time (minGreenSteps). The current phase must have been GREEN for at least this many steps before any switch is even considered.
-3. Force a round-robin switch at maximum green time (maxGreenSteps). This prevents a single direction from holding the green indefinitely when traffic is continuous.
-4. Gap-out. If no vehicles are waiting on any lane of the current phase, immediately jump to the highest-scoring phase. This avoids wasting time and cycling through empty phases one by one, which would be especially wasteful in light-traffic conditions.
-5. Score-based switch with hysteresis. If another phase scores strictly higher than the
-   current one by more than a configurable threshold (default 10%), the switch is triggered. The hysteresis window prevents rapid oscillation when two phases have nearly equal scores.
+1. **Minimum green** — no switch before `minGreenSteps` have elapsed.
+2. **Maximum green** — force a switch after `maxGreenSteps` to prevent starvation.
+3. **Gap-out** — if no vehicle is queued in the current phase, immediately switch to the highest-scoring phase.
+4. **Hysteresis switch** — switch when another phase's score exceeds the current by > 10 %. The threshold prevents rapid oscillation between nearly equal phases.
 
-When a switch is triggered, the signal transitions through the full cycle:
-GREEN -> YELLOW (if yellowSteps > 0) -> all-RED clearance -> GREEN (new phase).
-by default yellow step is disabled since we don't want the whole step to be consumed by the yellow phase. It is not needed anyway because frontend can simulate the yellow light visually without blocking the backend step.
+Transition: GREEN → YELLOW (skipped if `yellowSteps = 0`) → all-RED clearance → GREEN (new phase).
 
-### Safety guarantees
+### Safety
 
-Safety is enforced at two independent layers:
-
-Phase level (static): DSATUR ensures that no two signals in the same phase geometrically
-conflict. This is checked once at startup and never needs to be re-evaluated at runtime.
-
-Runtime yield (YieldCheck): For GENERIC left-turn movements, the system checks at each step whether an opposing vehicle with a straight or right-turn intent is already queued and also holds green. If so, the left-turning vehicle must wait in place even though its phase is green. PROTECTED left turns bypass this check entirely because the phase schedule already guarantees no opposing green.
+- **Static (DSATUR)**: conflicting signals are never in the same phase; checked once at startup.
+- **Runtime (YieldCheck)**: GENERIC left-turners yield to any opposing STRAIGHT/RIGHT vehicle that also holds green that step. PROTECTED left-turns skip this check.
 
 ### Complexity
 
-| Component                        | Complexity                       |
-|----------------------------------|----------------------------------|
-| Phase generation (DSATUR)        | O(V^3), V = signal count         |
-| Phase scoring per step           | O(P * L), P = phases, L = lanes  |
-| Vehicle departure per step       | O(L), L = active positions       |
-| EMA update per step              | O(N), N = total positions        |
+| Component                  | Complexity                                    |
+| -------------------------- | --------------------------------------------- |
+| Phase generation (DSATUR)  | O(V^3), V = number of signals — startup only   |
+| Phase scoring per step     | O(P × L) worst case                           |
+| Vehicle departure per step | O(A + Y·O + D log D)                          |
+| EMA update per step        | O(N), N = total lanes                         |
 
+P = phases, L = lanes, A = active positions, Y = yield-checked vehicles, O = opposite-road positions, D = departing vehicles.
 
-The DSATUR O(V^3) cost applies only to startup. During the simulation, the scoring loop uses bitmask operations (position bitmasks stored as long) to iterate only over the positions active in a given phase, avoiding per-lane array scans over all positions.
+Runtime scoring uses 64-bit position bitmasks to iterate only active positions, avoiding full lane scans.
 
 ---
 
-## Running the simulation (CLI)
+## Running
 
-The main entry point reads a JSON input file and writes a JSON output file. Build with Gradle
-and run:
+### CLI (JSON file)
 
 ```bash
 ./gradlew run --args="input.json output.json"
 ```
 
+### Spring Boot (local server)
+
+```bash
+./gradlew bootRun --args="--server.port=8080"
+```
 
 ### Input format
 
-The `config` section is optional. When omitted, the simulation defaults to one lane per road
-with GENERIC STRAIGHT/LEFT/RIGHT movements and timing (minGreen=1, maxGreen=5, yellow=0, red=1).
+The `config` block is optional. Without it the simulation uses one GENERIC lane (STRAIGHT / LEFT / RIGHT) per road and timing `minGreen=1, maxGreen=5, yellow=0, red=1`.
 
-Full example with multi-lane roads, a protected left-turn arrow, mixed signal groups, and
-custom lane weights (this is also scenario `05-multilane-grouped-signals` in `src/test/resources/scenarios/`):
+Full example (also scenario `05-multilane-grouped-signals`):
 
 ```json
 {
@@ -229,16 +188,11 @@ custom lane weights (this is also scenario `05-multilane-grouped-signals` in `sr
 }
 ```
 
-What this config sets up:
-
-- NORTH lane 0: one physical light (`n0-main`) covers both STRAIGHT and RIGHT together Because they share the same `trafficLightId`, they are one signal group -- one LaneSignal with a merged bitmask. That signal is GENERIC.
-- NORTH lane 1: a separate protected left-arrow (`n1-arrow`). Because it has a different ID, DSATUR treats it as an independent node. It will end up in its own phase, separate from the NORTH lane 0 signal, so the arrow can be green while the main light is red and vice versa.
-- SOUTH lane 0: one signal (`s0-main`) covering all three movements -- merged mask
-  STRAIGHT|RIGHT|LEFT, all GENERIC. A vehicle going LEFT on this lane must still yield at
-  runtime to oncoming traffic.
-- EAST and WEST: single standard lights covering all movements.
-- NORTH lane 0 has weight 1.5 so it scores 50% higher than default lanes when the
-  controller is deciding which phase to activate next.
+Key points of this config:
+- **NORTH lane 0** (`n0-main`): STRAIGHT + RIGHT share one signal (merged bitmask), GENERIC.
+- **NORTH lane 1** (`n1-arrow`): independent PROTECTED LEFT arrow — different ID, so DSATUR places it in its own phase.
+- **SOUTH lane 0** (`s0-main`): all three movements merged into one GENERIC signal; LEFT yields at runtime.
+- **NORTH lane 0 weight 1.5**: scores 50 % higher than default lanes when the controller picks the next phase.
 
 ### Output format
 
@@ -251,78 +205,43 @@ What this config sets up:
 }
 ```
 
-Each entry in `stepStatuses` corresponds to one `step` command.
+Each entry corresponds to one `step` command.
 
 ---
 
 ## Running via Docker
 
-### 1) Build the image
-
 ```bash
 docker build -t trafficsim:latest .
-```
-
-### 2) Start the container
-
-```bash
 docker run --rm -p 8080:8080 --name trafficsim trafficsim:latest
 ```
 
-The application is then available at:
-- http://localhost:8080
-- WebSocket: ws://localhost:8080/v1/ws/simulation
+Available at `http://localhost:8080` / `ws://localhost:8080/v1/ws/simulation`.
 
 ## Web client
 
-The frontend is in the `web/` directory.
+```bash
+# 1. Start the backend (locally or in Docker)
+# 2. Serve the frontend
+python -m http.server 5500 --directory web
+# 3. Open http://localhost:5500
+```
 
-Quick start:
-1. Start the backend (locally or in Docker).
-2. In a separate terminal, serve the frontend:
-   ```bash
-   python -m http.server 5500 --directory web
-   ```
-3. Open: http://localhost:5500
-
-Details: `web/README.md`.
+See `web/README.md` for details.
 
 ## E2E tests (Docker Compose)
 
-End-to-end tests run the application in a separate container on port 9090 and send a full
-WebSocket scenario (addVehicle -> step -> assertion).
-
 ```bash
-# 1. Build the application image
 docker build -t trafficsim:latest .
-
-# 2. Run the E2E suite
 docker compose -f docker-compose.e2e.yml up --abort-on-container-exit --exit-code-from e2e
-
-# 3. Clean up
 docker compose -f docker-compose.e2e.yml down --remove-orphans
 ```
 
-What the test (`e2e/run.js`) checks:
-1. Waits for `GET /health` to return `{"status":"UP"}` (retries up to 30 s).
-2. Connects via WebSocket.
-3. Sends init `{}`, two `addVehicle` commands, two `step` commands, then `stop`.
-4. Asserts that the first `StepStatus.leftVehicles` contains both vehicles.
+The test (`e2e/run.js`) waits for `/health`, connects via WebSocket, sends `addVehicle` × 2 + `step` × 2, and asserts both vehicles departed in the first step.
 
-## GitHub Actions -- `workflow.yml`
+## GitHub Actions — `workflow.yml`
 
-File: `.github/workflows/workflow.yml`
+Triggers: push/PR to `main`/`master`, manual dispatch.
 
-The workflow runs on:
-- `push` to `main`/`master`
-- `pull_request` to `main`/`master`
-- manually (`workflow_dispatch`)
-
-### Job 1 -- `build`
-1. Sets up JDK 17, runs `./gradlew clean build`.
-2. Publishes artifacts: `app-jar`, `test-reports`, `web-client`.
-
-### Job 2 -- `e2e` (depends on `build`)
-1. Builds the Docker image.
-2. Runs `docker-compose.e2e.yml` with the test container.
-3. On failure, dumps logs from both containers.
+- **build**: `./gradlew clean build`, publishes `app-jar`, `test-reports`, `web-client`.
+- **e2e** (after build): builds Docker image, runs `docker-compose.e2e.yml`, dumps logs on failure.

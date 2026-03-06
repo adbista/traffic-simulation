@@ -13,8 +13,17 @@ import { getDomElements }       from './ui/dom-elements.js';
 
 // DOM
 const dom = getDomElements();
-const _proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-dom.wsUrl.value = `${_proto}//${location.host}/v1/ws/simulation`;
+// Auto-set WS URL only when the page is served by the backend itself (same origin).
+// When using a separate dev server (e.g. python -m http.server 5500), keep the
+// hardcoded default from the HTML attribute so it still points to Spring Boot.
+{
+    const _proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const defaultBackendPort = '8080';
+    const servedByBackend = location.port === defaultBackendPort || location.port === '';
+    if (servedByBackend) {
+        dom.wsUrl.value = `${_proto}//${location.host}/v1/ws/simulation`;
+    }
+}
 
 // Services
 const logger      = new LogView(dom.eventLog);
@@ -121,6 +130,60 @@ dom.scenarioSelect.addEventListener('change', () => {
     if (SCENARIOS[val] !== undefined) dom.initPayload.value = SCENARIOS[val];
 });
 
+// --- Vehicle form: smart lane/endRoad dropdowns ---
+// Road cycle matches Java Road enum ordinals: NORTH=0, WEST=1, SOUTH=2, EAST=3
+const ROAD_CYCLE = ['north', 'west', 'south', 'east'];
+const ROAD_LABEL = { north: '\u2191 north', west: '\u2190 west', south: '\u2193 south', east: '\u2192 east' };
+const MOVEMENT_OFFSET = { RIGHT: 1, STRAIGHT: 2, LEFT: 3 };
+
+function movementToEndRoad(fromRoad, movement) {
+    const idx = ROAD_CYCLE.indexOf(fromRoad);
+    return ROAD_CYCLE[(idx + MOVEMENT_OFFSET[movement]) % 4];
+}
+
+function getValidLaneIndices(road) {
+    const lanes = cfg.lanes[road] ?? [];
+    return lanes.length > 0 ? lanes.map(l => l.laneIndex) : [0];
+}
+
+function getValidEndRoads(startRoad, laneIndex) {
+    const lanes = cfg.lanes[startRoad] ?? [];
+    const laneEntry = lanes[laneIndex];
+    if (!laneEntry || laneEntry.signals.length === 0) {
+        // Default config: all three directions
+        return ROAD_CYCLE.filter(r => r !== startRoad);
+    }
+    const movements = new Set(laneEntry.signals.flatMap(s => s.movements));
+    const ends = [...movements].map(m => movementToEndRoad(startRoad, m));
+    return [...new Set(ends)].filter(r => r !== startRoad);
+}
+
+function updateEndRoadSelect() {
+    const startRoad = dom.startRoad.value;
+    const laneIdx = parseInt(dom.lane.value, 10) || 0;
+    const validEnds = getValidEndRoads(startRoad, laneIdx);
+    const current = dom.endRoad.value;
+    dom.endRoad.innerHTML = validEnds.map(r => `<option value="${r}">${ROAD_LABEL[r]}</option>`).join('');
+    if (validEnds.includes(current)) dom.endRoad.value = current;
+}
+
+function updateVehicleForm() {
+    const startRoad = dom.startRoad.value;
+    const validLanes = getValidLaneIndices(startRoad);
+    const currentLane = parseInt(dom.lane.value, 10);
+    dom.lane.innerHTML = validLanes.map(i => `<option value="${i}">${i}</option>`).join('');
+    if (validLanes.includes(currentLane)) dom.lane.value = String(currentLane);
+    updateEndRoadSelect();
+}
+
+let vehicleCounter = 1;
+function nextVehicleId() { return `v-${vehicleCounter}`; }
+
+dom.startRoad.addEventListener('change', updateVehicleForm);
+dom.lane.addEventListener('change', updateEndRoadSelect);
+updateVehicleForm();
+dom.vehicleId.value = nextVehicleId();
+
 // Status view
 const statusView = new StatusView({
     connectionStatusElement: dom.connectionStatus,
@@ -155,6 +218,7 @@ controller = new SimulationController({
 
 controller.onConfigChanged = () => {
     needsRedraw = true;
+    updateVehicleForm();
 };
 
 controller.onStepProcessed = (entry) => {
@@ -179,7 +243,9 @@ dom.initBtn.addEventListener('click', () => {
         controller.initialize(dom.initPayload.value);
         store.reset();
         totalLeft = 0;
+        vehicleCounter = 1;
         historyView.clear();
+        dom.vehicleId.value = nextVehicleId();
     } catch (e) { logger.error(e.message); }
 });
 
@@ -192,7 +258,8 @@ dom.addVehicleForm.addEventListener('submit', (e) => {
             endRoad:   dom.endRoad.value,
             lane:      dom.lane.value,
         });
-        dom.vehicleId.value = '';
+        vehicleCounter++;
+        dom.vehicleId.value = nextVehicleId();
     } catch (e) { logger.error(e.message); }
 });
 

@@ -66,7 +66,9 @@
                     </div>
                     <div class="field">
                         <label for="lane">lane</label>
-                        <input id="lane" type="number" min="0" placeholder="0" />
+                        <select id="lane">
+                            <option value="0">0</option>
+                        </select>
                     </div>
                     <div class="field">
                         <label for="startRoad">startRoad</label>
@@ -80,8 +82,7 @@
                     <div class="field">
                         <label for="endRoad">endRoad</label>
                         <select id="endRoad" required>
-                            <option value="north" selected>&#8593; north</option>
-                            <option value="south">&#8595; south</option>
+                            <option value="north">&#8593; north</option>
                             <option value="east">&#8594; east</option>
                             <option value="west">&#8592; west</option>
                         </select>
