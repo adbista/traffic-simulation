@@ -221,7 +221,9 @@ Available at `http://localhost:8080` / `ws://localhost:8080/v1/ws/simulation`.
 ## Web client
 
 **Recommended**:
-You can run the spring boot app using 
+Firstly, go to web directory, run  `npm ci` and `npm run build` to create js files.
+Then go to the root directory.
+Now, you can run the spring boot app using 
 `./gradlew bootRun --args="--server.port=8080"` and then open `http://localhost:8080` to access the web client.
 
 **Alternative** (serving static files with Python):
