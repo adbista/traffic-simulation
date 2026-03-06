@@ -1,0 +1,6 @@
+{
+  "stepStatuses": [
+    {"leftVehicles": ["vehicle2"]},
+    {"leftVehicles": ["vehicle1"]}
+  ]
+}

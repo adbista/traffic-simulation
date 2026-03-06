@@ -1,7 +1,7 @@
-function getById(id) {
-    const element = document.getElementById(id);
-    if (!element) throw new Error(`Missing DOM element: #${id}`);
-    return element;
+﻿function getById(id) {
+    const el = document.getElementById(id);
+    if (!el) throw new Error(`Missing DOM element: #${id}`);
+    return el;
 }
 
 export function getDomElements() {
@@ -15,20 +15,28 @@ export function getDomElements() {
         initPayload:       getById('initPayload'),
         initBtn:           getById('initBtn'),
         initStatus:        getById('initStatus'),
-        // commands
+        scenarioSelect:    getById('scenarioSelect'),
+        // vehicle add
         addVehicleForm:    getById('addVehicleForm'),
         vehicleId:         getById('vehicleId'),
         startRoad:         getById('startRoad'),
         endRoad:           getById('endRoad'),
         lane:              getById('lane'),
         addVehicleBtn:     getById('addVehicleBtn'),
+        // step controls
         stepBtn:           getById('stepBtn'),
         stopBtn:           getById('stopBtn'),
-        // visualisation
+        autoStepCheck:     getById('autoStepCheck'),
+        autoStepInterval:  getById('autoStepInterval'),
+        // canvas
         intersectionCanvas: getById('intersectionCanvas'),
         vehicleCanvas:      getById('vehicleCanvas'),
+        // panels
+        phasePanel:         getById('phasePanel'),
         stepHistory:        getById('stepHistory'),
-        // log
         eventLog:           getById('eventLog'),
+        statsSteps:         getById('statsSteps'),
+        statsLeft:          getById('statsLeft'),
+        statsQueued:        getById('statsQueued'),
     };
 }

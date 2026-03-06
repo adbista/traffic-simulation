@@ -1,65 +1,88 @@
 package org.example.trafficsim.core;
 
-import org.example.trafficsim.control.SignalController;
+import org.example.trafficsim.control.PhaseController;
+import org.example.trafficsim.metrics.FlowEmaTracker;
+import org.example.trafficsim.metrics.GreenStepTracker;
 import org.example.trafficsim.model.Road;
 import org.example.trafficsim.model.Vehicle;
 import org.example.trafficsim.signal.ActivePhase;
 import org.example.trafficsim.signal.Phase;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 
 public class SimulationEngine {
     private final TrafficQueues queues;
     private final ActivePhase activePhase;
-    private final SignalController controller;
-    private long stepNo = 0;
-    private long vehicleSeq = 0;
+    private final PhaseController controller;
+    private final FlowEmaTracker flowTracker;
+    private final GreenStepTracker greenTracker;
+    private int stepNo = 0;
+    private int vehicleSeq = 0;
 
-    public SimulationEngine(TrafficQueues queues, ActivePhase activePhase, SignalController controller) {
+    public SimulationEngine(TrafficQueues queues, ActivePhase activePhase, PhaseController controller,
+                            FlowEmaTracker flowTracker, GreenStepTracker greenTracker) {
         this.queues = queues;
         this.activePhase = activePhase;
         this.controller = controller;
+        this.flowTracker = flowTracker;
+        this.greenTracker = greenTracker;
     }
 
     public void addVehicle(String id, Road start, Road end, int lane) {
-        queues.addVehicle(new Vehicle(id, start, end, stepNo, vehicleSeq++, lane));
+        int posId = queues.addVehicle(new Vehicle(id, start, end, stepNo, vehicleSeq++, lane));
+        flowTracker.onArrival(posId);
+
     }
 
     public StepResult step() {
         stepNo++;
+        flowTracker.advanceStep();
 
-        List<Vehicle> departing = new ArrayList<>();
         Phase currentPhase = activePhase.current();
 
-        Set<Road> greens = activePhase.isGreen()
-                ? currentPhase.greenRoads()
-                : Set.of();
+        List<Vehicle> departing = new ArrayList<>();
 
-        for (Road r : greens) {
-            Set<Integer> greenLanes = currentPhase.greenLanesFor(r);
-            for (int laneIdx : greenLanes) {
-                queues.markGreenNow(r, laneIdx, stepNo);
+        if (activePhase.isGreen()) {
+            long greenMask = currentPhase.positionsMask();
+            long tmp = greenMask;
 
-                Vehicle v = queues.pollSpecificLane(r, laneIdx);
-                if (v != null) {
+            while (tmp != 0) {
+                int posId = Long.numberOfTrailingZeros(tmp);
+                tmp &= tmp - 1;
+
+                greenTracker.markGreenNow(posId, stepNo);
+
+                if ((queues.nonEmptyPositionsMask() & (1L << posId)) == 0L) {
+                    continue;
+                }
+
+                Vehicle head = queues.peek(posId);
+                Road fromRoad = queues.roadOf(posId);
+
+                boolean allowed = currentPhase.allowsDeparture(posId, fromRoad, head.endRoad());
+                boolean yieldOk = allowed && YieldCheck.check(head, currentPhase, queues);
+
+                if (yieldOk) {
+                    Vehicle v = queues.poll(posId);
                     departing.add(v);
                 }
             }
-        }
+        } 
 
         departing.sort(Comparator.comparingLong(Vehicle::seqNum));
-
-        controller.maybeRequestSwitch(queues, stepNo, activePhase);
-        activePhase.tick(controller::resolve);
-
         List<String> leftVehicles = new ArrayList<>(departing.size());
-        for (Vehicle v : departing) {
-            leftVehicles.add(v.id());
-        }
+        for (Vehicle v : departing) leftVehicles.add(v.id());
 
-        return new StepResult(leftVehicles);
+        // decision first, then FSM tick
+        controller.managePhaseSwitch(queues, stepNo, activePhase);
+        activePhase.manageLightState();
+
+        return new StepResult(leftVehicles, activePhase.current().id(), activePhase.currentState());
     }
+
+    public List<Phase> getPhases() {
+        return controller.getPhases();
+    }
+
 }

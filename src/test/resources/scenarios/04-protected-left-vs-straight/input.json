@@ -1,0 +1,20 @@
+{
+  "config": {
+    "timing": { "minGreen": 1, "maxGreen": 2, "yellow": 0, "red": 1 },
+    "laneDeclarations": [
+      { "road": "north", "lane": 0, "movements": [{"movement": "STRAIGHT", "type": "GENERIC", "trafficLightId": "t1"}] },
+      { "road": "north", "lane": 1, "movements": [{"movement": "LEFT", "type": "PROTECTED", "trafficLightId": "t1"}] },
+      { "road": "south", "lane": 0, "movements": [{"movement": "STRAIGHT", "type": "GENERIC", "trafficLightId": "t1"}, {"movement": "RIGHT", "type": "GENERIC", "trafficLightId": "t1"}, {"movement": "LEFT", "type": "GENERIC", "trafficLightId": "t1"}] },
+      { "road": "east",  "lane": 0, "movements": [{"movement": "STRAIGHT", "type": "GENERIC", "trafficLightId": "t1"}, {"movement": "RIGHT", "type": "GENERIC", "trafficLightId": "t1"}, {"movement": "LEFT", "type": "GENERIC", "trafficLightId": "t1"}] },
+      { "road": "west",  "lane": 0, "movements": [{"movement": "STRAIGHT", "type": "GENERIC", "trafficLightId": "t1"}, {"movement": "RIGHT", "type": "GENERIC", "trafficLightId": "t1"}, {"movement": "LEFT", "type": "GENERIC", "trafficLightId": "t1"}] }
+    ]
+  },
+  "commands": [
+    {"type": "addVehicle", "vehicleId": "v1-north-protected-left", "startRoad": "north", "endRoad": "east",  "lane": 1},
+    {"type": "addVehicle", "vehicleId": "v2-south-straight",        "startRoad": "south", "endRoad": "north", "lane": 0},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"},
+    {"type": "step"}
+  ]
+}

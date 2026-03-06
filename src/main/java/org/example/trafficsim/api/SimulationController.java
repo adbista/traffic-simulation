@@ -1,7 +1,7 @@
 package org.example.trafficsim.api;
 
 import jakarta.validation.Valid;
-import org.example.trafficsim.cli.SimulationRunner;
+import org.example.trafficsim.app.SimulationRunner;
 import org.example.trafficsim.io.InputFile;
 import org.example.trafficsim.io.OutputFile;
 import org.springframework.http.MediaType;

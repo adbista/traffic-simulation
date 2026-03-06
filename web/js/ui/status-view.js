@@ -9,7 +9,7 @@ export class StatusView {
     }
 
     setConnected(connected) {
-        this._conn.textContent = connected ? 'Połączono' : 'Rozłączono';
+        this._conn.textContent = connected ? 'Connected' : 'Disconnected';
         this._conn.className   = connected ? 'status status-online' : 'status status-offline';
 
         this._ctrls.connectBtn.disabled    = connected;
@@ -20,7 +20,7 @@ export class StatusView {
     }
 
     setInitialized(initialized) {
-        this._init.textContent = initialized ? 'Zainicjalizowano' : 'Nie zainicjalizowano';
+        this._init.textContent = initialized ? 'Initialized' : 'Not initialized';
         this._init.className   = initialized ? 'status status-online' : 'status status-offline';
 
         this._ctrls.addVehicleBtn.disabled = !initialized;

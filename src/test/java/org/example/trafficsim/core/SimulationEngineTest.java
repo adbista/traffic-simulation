@@ -1,142 +1,86 @@
 package org.example.trafficsim.core;
 
-import org.example.trafficsim.cli.SimulationEngineBuilder;
+import org.example.trafficsim.config.IntersectionConfig;
+import org.example.trafficsim.io.InputReader;
+import org.example.trafficsim.io.SimConfig;
 import org.example.trafficsim.model.Road;
-import org.junit.jupiter.api.BeforeEach;
+import org.example.trafficsim.model.Vehicle;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for {@link SimulationEngine}.
- *
- * Uses {@link SimulationEngineBuilder} with default settings so that all collaborators
- * (TrafficQueues, ActivePhase, SignalController) are properly wired — this keeps tests
- * focused on engine behaviour without duplicating wiring logic.
- *
- * SOLID notes:
- *  - SRP  : SimulationEngine orchestrates one step of the simulation; construction is
- *           delegated to SimulationEngineBuilder (Builder pattern, SRP).
- *  - OCP  : Phase selection policy is injected (DIP), so engine behaviour can be extended
- *           by swapping the policy without modifying SimulationEngine.
- *  - LSP  : StepResult is an immutable record — no subclassing issues.
- *  - ISP  : Engine exposes only addVehicle() and step() — minimal surface.
- *  - DIP  : Engine depends on abstractions (PhaseSelectionPolicy, ActivePhase) not concretions.
- */
 class SimulationEngineTest {
 
-    private SimulationEngine engine;
-
-    @BeforeEach
-    void setUp() {
-        engine = new SimulationEngineBuilder().build();
+    private SimulationEngine defaultEngine() {
+        IntersectionConfig config = InputReader.parseConfig((SimConfig) null);
+        return new SimulationEngineBuilder(config).build();
     }
 
-    // -----------------------------------------------------------------------
-    // step() — basic mechanics
-    // -----------------------------------------------------------------------
-
     @Test
-    void step_withNoVehicles_returnsEmptyLeftVehicles() {
-        StepResult result = engine.step();
-        assertNotNull(result);
+    void step_emptyQueues_returnsNoVehicles() {
+        StepResult result = defaultEngine().step();
         assertTrue(result.leftVehicles().isEmpty());
     }
 
-    @Test
-    void step_calledMultipleTimes_neverThrows() {
-        assertDoesNotThrow(() -> {
-            for (int i = 0; i < 20; i++) engine.step();
-        });
-    }
 
     @Test
-    void step_returnsNewListEachCall() {
-        StepResult r1 = engine.step();
-        StepResult r2 = engine.step();
-        // Records are distinct objects (even if both empty)
-        assertNotSame(r1, r2);
-    }
-
-    // -----------------------------------------------------------------------
-    // addVehicle + step — departure logic
-    // -----------------------------------------------------------------------
-
-    @Test
-    void addVehicle_thenStep_vehicleDepartsWithinPhase() {
-        engine.addVehicle("v1", Road.NORTH, Road.SOUTH, 0);
-
-        // Run enough steps to ensure a green phase for NORTH is reached
-        boolean departed = false;
-        for (int i = 0; i < 10 && !departed; i++) {
-            StepResult result = engine.step();
-            if (result.leftVehicles().contains("v1")) departed = true;
-        }
-
-        assertTrue(departed, "v1 must depart within 10 steps");
-    }
-
-    @Test
-    void addVehicle_departsOnlyOnce() {
-        engine.addVehicle("unique", Road.NORTH, Road.SOUTH, 0);
-
-        int departureCount = 0;
-        for (int i = 0; i < 15; i++) {
-            if (engine.step().leftVehicles().contains("unique")) departureCount++;
-        }
-
-        assertEquals(1, departureCount, "vehicle must depart exactly once");
-    }
-
-    @Test
-    void twoVehiclesSameRoad_departOnDifferentSteps_fifo() {
-        engine.addVehicle("first",  Road.NORTH, Road.SOUTH, 0);
-        engine.addVehicle("second", Road.NORTH, Road.SOUTH, 0);
-
-        // Run until both have departed
-        List<String> firstDeparture  = null;
-        List<String> secondDeparture = null;
-        for (int i = 0; i < 20; i++) {
-            List<String> left = engine.step().leftVehicles();
-            if (firstDeparture == null && left.contains("first"))  firstDeparture  = left;
-            if (secondDeparture == null && left.contains("second")) secondDeparture = left;
-        }
-
-        assertNotNull(firstDeparture,  "first vehicle must depart");
-        assertNotNull(secondDeparture, "second vehicle must depart");
-        // FIFO: second can only depart AFTER first
-        assertTrue(firstDeparture.contains("first") || secondDeparture.contains("second"),
-                "vehicles must depart in FIFO order");
-    }
-
-    @Test
-    void vehiclesOnOppositeGreenRoads_canDepartInSameStep() {
-        // NS phase: both NORTH and SOUTH are green simultaneously
+    void allVehiclesEventuallyLeave_multipleDirections() {
+        SimulationEngine engine = defaultEngine();
         engine.addVehicle("n1", Road.NORTH, Road.SOUTH, 0);
         engine.addVehicle("s1", Road.SOUTH, Road.NORTH, 0);
+        engine.addVehicle("e1", Road.EAST,  Road.WEST,  0);
+        engine.addVehicle("w1", Road.WEST,  Road.EAST,  0);
 
+        List<String> all = new ArrayList<>();
+        for (int i = 0; i < 30; i++) all.addAll(engine.step().leftVehicles());
+
+        assertTrue(all.containsAll(List.of("n1", "s1", "e1", "w1")));
+    }
+
+
+    @Test
+    void sameLane_straightVsLeft_departureOrder() {
+        SimulationEngine engine = defaultEngine();
+        engine.addVehicle("straight", Road.NORTH, Road.SOUTH, 0);
+        engine.addVehicle("left",     Road.NORTH, Road.EAST,  0);
+
+        List<String> all = new ArrayList<>();
+        for (int i = 0; i < 30; i++) all.addAll(engine.step().leftVehicles());
+
+        assertTrue(all.indexOf("straight") < all.indexOf("left"), "Straight vehicle should depart before left-turning vehicle from the same lane");
+    }
+
+    @Test
+    void sameLane_vehiclesDepartInArrivalOrder() {
+        SimulationEngine engine = defaultEngine();
+        engine.addVehicle("first",  Road.NORTH, Road.SOUTH, 0);
+        engine.addVehicle("second", Road.NORTH, Road.SOUTH, 0);
+        // Only the head of the queue departs each step
         List<String> step1 = engine.step().leftVehicles();
-        // Both should depart on the same step when NS phase is active
-        assertTrue(step1.containsAll(List.of("n1", "s1")),
-                "NORTH and SOUTH vehicles should depart together in NS phase, got: " + step1);
-    }
-
-    // -----------------------------------------------------------------------
-    // addVehicle — error cases
-    // -----------------------------------------------------------------------
-
-    @Test
-    void addVehicle_invalidLane_throwsIllegalArgumentException() {
-        // Default engine has 1 lane (index 0); lane 5 is invalid
-        assertThrows(IllegalArgumentException.class,
-                () -> engine.addVehicle("v", Road.NORTH, Road.SOUTH, 5));
+        assertFalse(step1.isEmpty());
+        assertEquals("first", step1.get(0));
     }
 
     @Test
-    void addVehicle_negativeLane_throwsIllegalArgumentException() {
+    void step_incrementsVehicleCount_acrossMultipleCalls() {
+        SimulationEngine engine = defaultEngine();
+        engine.addVehicle("a", Road.NORTH, Road.SOUTH, 0);
+        engine.addVehicle("b", Road.NORTH, Road.SOUTH, 0);
+
+        List<String> all = new ArrayList<>();
+        for (int i = 0; i < 20; i++) all.addAll(engine.step().leftVehicles());
+
+        assertTrue(all.contains("a"));
+        assertTrue(all.contains("b"));
+    }
+
+    @Test
+    void addVehicle_toInvalidLane_throws() {
+        SimulationEngine engine = defaultEngine();
         assertThrows(IllegalArgumentException.class,
-                () -> engine.addVehicle("v", Road.NORTH, Road.SOUTH, -1));
+                () -> engine.addVehicle("v", Road.NORTH, Road.SOUTH, 99));
     }
 }
