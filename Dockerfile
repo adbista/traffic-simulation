@@ -1,6 +1,8 @@
 FROM eclipse-temurin:17-jdk-jammy AS builder
 WORKDIR /workspace
 
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 
 RUN chmod +x ./gradlew && ./gradlew --no-daemon clean bootJar
