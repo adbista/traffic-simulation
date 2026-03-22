@@ -52,7 +52,7 @@ The system uses **DSATUR** (Degree of Saturation):
 3. Assign the lowest-numbered color not used by any neighbor.
 4. Repeat until all nodes are colored. Each color group becomes one phase.
 
-Complexity: O(V³) where V = number of signals, paid once at startup.
+Complexity: O(V^2) where V = number of signals, paid once at startup.
 
 Conflict rules:
 - **Same road**: never conflict.
