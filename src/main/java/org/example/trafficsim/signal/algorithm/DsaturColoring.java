@@ -16,77 +16,81 @@ import java.util.function.BiPredicate;
  *
  * At every step DSATUR picks the uncolored node with the highest saturation
  * (number of distinct colors already used by its neighbors), breaking ties by
- * uncolored-neighbor degree.  It then assigns the smallest color not used by
- * any neighbor.
+ * the number of uncolored conflicting neighbors (degree). It then assigns the
+ * smallest color not used by any neighbor.
  *
- * complexity: O(V^3) in this straightforward implementation, 
+ * Complexity: O(V^2)
  *
- * @return int array of length {@code signals.size()}: {@code colors[i]} is
- *         the 0-based phase index assigned to {@code signals.get(i)}.
  */
 public class DsaturColoring {
 
     public int[] color(List<LaneSignal> signals, BiPredicate<LaneSignal, LaneSignal> conflicts) {
         int n = signals.size();
+
+        // Result array -1 means not yet colored
         int[] colors = new int[n];
         Arrays.fill(colors, -1);
 
-        // saturation[i] = number of distinct neighbor colors already assigned
+        // saturation[i] = number of distinct colors already assigned to neighbors of i
         int[] saturation = new int[n];
-        // degree[i]     = number of still-uncolored conflicting neighbors
+
+        // degree[i] = number of still-uncolored conflicting neighbors of i
         int[] degree = new int[n];
 
-        // Pre-compute adjacency matrix
-        boolean[][] adj = new boolean[n][n];
+
+        Set<Integer>[] neighbors = new HashSet[n];
+        for (int i = 0; i < n; i++) {
+            neighbors[i] = new HashSet<>();
+        }
+
+        // neighborColors[i] = set of colors already present among the colored neighbors of i
+        Set<Integer>[] neighborColors = new HashSet[n];
+        for (int i = 0; i < n; i++) {
+            neighborColors[i] = new HashSet<>();
+        }
+
+        // Build the conflict graph Check every pair (i, j) exactly once
         for (int i = 0; i < n; i++) {
             for (int j = i + 1; j < n; j++) {
                 if (conflicts.test(signals.get(i), signals.get(j))) {
-                    adj[i][j] = adj[j][i] = true;
+                    neighbors[i].add(j);
+                    neighbors[j].add(i);
                     degree[i]++;
                     degree[j]++;
                 }
             }
         }
 
+        //  Main coloring loop, one node colored per iteration
         for (int iter = 0; iter < n; iter++) {
-            // Pick the uncolored node with highest saturation (degree as tiebreak)
+
+            // Step 1: pick the uncolored node with the highest saturation
+            // Ties are broken by degree
             int chosen = -1;
             for (int i = 0; i < n; i++) {
                 if (colors[i] != -1) continue;
                 if (chosen == -1
                         || saturation[i] > saturation[chosen]
-                        || (saturation[i] == saturation[chosen] && degree[i] > degree[chosen])) {
+                        || (saturation[i] == saturation[chosen]
+                        && degree[i] > degree[chosen])) {
                     chosen = i;
                 }
             }
 
-            // Assign the smallest color not used by any neighbor
-            Set<Integer> usedByNeighbors = new HashSet<>();
-            for (int j = 0; j < n; j++) {
-                if (adj[chosen][j] && colors[j] != -1) {
-                    usedByNeighbors.add(colors[j]);
-                }
-            }
+            // Step 2: assign the smallest color not used by any neighbor
             int c = 0;
-            while (usedByNeighbors.contains(c)) c++;
+            while (neighborColors[chosen].contains(c)) c++;
             colors[chosen] = c;
 
-            // Update saturation of uncolored neighbors:
-            // if color c is new in their neighborhood, increment their saturation
-            for (int j = 0; j < n; j++) {
-                if (!adj[chosen][j] || colors[j] != -1) continue;
-
-                // Check whether color c was already seen by j from another neighbor
-                boolean alreadySeen = false;
-                for (int k = 0; k < n; k++) {
-                    if (k != chosen && adj[j][k] && colors[k] == c) {
-                        alreadySeen = true;
-                        break;
-                    }
-                }
-                if (!alreadySeen) {
+            // Step 3: propagate the new color to uncolored neighbors
+            for (int j : neighbors[chosen]) {
+                if (colors[j] != -1) continue; // skip already-colored neighbors
+                // saturation increases.
+                if (neighborColors[j].add(c)) {
                     saturation[j]++;
                 }
+
+                // chosen is now colored, so j has one fewer uncolored neighbor
                 degree[j]--;
             }
         }
